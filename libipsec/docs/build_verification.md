@@ -41,7 +41,7 @@ successfully built:
 - `ipsec_native_static`
 - `ipsec_native_shared`
 - all six unit-test targets
-- `ipsec_native_app`
+- `ipsec_app`
 - opt-in `test_live_ipsec`
 
 `cmake --install` successfully installed the static library, versioned shared

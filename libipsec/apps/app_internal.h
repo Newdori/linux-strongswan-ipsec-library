@@ -1,5 +1,5 @@
-#ifndef IPSEC_NATIVE_APP_INTERNAL_H
-#define IPSEC_NATIVE_APP_INTERNAL_H
+#ifndef IPSEC_APP_INTERNAL_H
+#define IPSEC_APP_INTERNAL_H
 
 #include "ipsec.h"
 

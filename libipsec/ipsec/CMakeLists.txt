@@ -87,22 +87,22 @@ install(FILES
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 if(IPSEC_NATIVE_BUILD_APPLICATION)
-    add_executable(ipsec_native_app
+    add_executable(ipsec_app
         ../apps/config.c
         ../apps/lifecycle.c
         ../apps/status.c
         ../apps/main.c)
-    set_target_properties(ipsec_native_app PROPERTIES
+    set_target_properties(ipsec_app PROPERTIES
         C_STANDARD 11
         C_STANDARD_REQUIRED YES
         C_EXTENSIONS NO)
-    target_compile_definitions(ipsec_native_app PRIVATE
+    target_compile_definitions(ipsec_app PRIVATE
         _POSIX_C_SOURCE=200809L)
-    target_compile_options(ipsec_native_app PRIVATE
+    target_compile_options(ipsec_app PRIVATE
         -Wall -Wextra -Wpedantic -Werror)
-    target_include_directories(ipsec_native_app PRIVATE
+    target_include_directories(ipsec_app PRIVATE
         ../apps)
-    target_link_libraries(ipsec_native_app PRIVATE ipsec_native_static)
+    target_link_libraries(ipsec_app PRIVATE ipsec_native_static)
 endif()
 
 if(BUILD_TESTING)

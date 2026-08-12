@@ -33,7 +33,7 @@ endif
 
 OBJECT_DIR = obj/$(TARGET)
 OUTPUT_DIR = bin/$(TARGET)
-APPLICATION = $(OUTPUT_DIR)/ipsec_native_app
+APPLICATION = $(OUTPUT_DIR)/ipsec_app
 
 SOURCES = \
 	config.c \

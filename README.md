@@ -128,7 +128,7 @@ See:
 - [Native CLI application](libipsec/apps/README.md)
 - [Public API](libipsec/docs/public_api.md)
 
-The `ipsec_native_app` target reuses product-relevant settings from v15
+The `ipsec_app` target reuses product-relevant settings from v15
 endpoint configuration files and provides `load`, `up`, `down`, IKE/CHILD
 rekey, structured `status`, and live `loop` verification commands. It does not
 carry over v15 packet capture, traffic generation, firewall, matrix, barrier,

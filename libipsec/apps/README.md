@@ -1,6 +1,6 @@
 # Native IPsec application
 
-`ipsec_native_app` is a product-oriented control and status CLI linked to
+`ipsec_app` is a product-oriented control and status CLI linked to
 `libipsec.a`. It reads the product-relevant fields from the existing v15
 `key=value` configuration files. v15 capture, UDP traffic, matrix, firewall and
 barrier settings are accepted only so the same file can be reused; those test
@@ -39,11 +39,11 @@ Outputs are separated by architecture:
 ```text
 lib/x86_64/libipsec.a
 apps/obj/x86_64/*.o
-apps/bin/x86_64/ipsec_native_app
+apps/bin/x86_64/ipsec_app
 
 lib/zynqmp/libipsec.a
 apps/obj/zynqmp/*.o
-apps/bin/zynqmp/ipsec_native_app
+apps/bin/zynqmp/ipsec_app
 ```
 
 For compatibility, the parent host Makefile delegates its `app` target to the
@@ -56,13 +56,13 @@ make -C ipsec -f Makefile.host app
 ## Commands
 
 ```sh
-./apps/bin/x86_64/ipsec_native_app --config /path/pc_a_initiator.conf check
-./apps/bin/x86_64/ipsec_native_app --config /path/pc_a_initiator.conf load
-./apps/bin/x86_64/ipsec_native_app --config /path/pc_a_initiator.conf up
-./apps/bin/x86_64/ipsec_native_app --config /path/pc_a_initiator.conf status all
-./apps/bin/x86_64/ipsec_native_app --config /path/pc_a_initiator.conf status child
-./apps/bin/x86_64/ipsec_native_app --config /path/pc_a_initiator.conf rekey-child
-./apps/bin/x86_64/ipsec_native_app --config /path/pc_a_initiator.conf down
+./apps/bin/x86_64/ipsec_app --config /path/pc_a_initiator.conf check
+./apps/bin/x86_64/ipsec_app --config /path/pc_a_initiator.conf load
+./apps/bin/x86_64/ipsec_app --config /path/pc_a_initiator.conf up
+./apps/bin/x86_64/ipsec_app --config /path/pc_a_initiator.conf status all
+./apps/bin/x86_64/ipsec_app --config /path/pc_a_initiator.conf status child
+./apps/bin/x86_64/ipsec_app --config /path/pc_a_initiator.conf rekey-child
+./apps/bin/x86_64/ipsec_app --config /path/pc_a_initiator.conf down
 ```
 
 `up` loads the connection and PSK, then initiates and waits for an installed
@@ -81,7 +81,7 @@ matching `reqid` in kernel XFRM state and policy, terminates the SA, waits until
 VICI and XFRM entries disappear, and unloads the connection.
 
 ```sh
-./apps/bin/x86_64/ipsec_native_app --config /path/pc_a_initiator.conf loop \
+./apps/bin/x86_64/ipsec_app --config /path/pc_a_initiator.conf loop \
     --count 100 --delay-ms 500
 ```
 
