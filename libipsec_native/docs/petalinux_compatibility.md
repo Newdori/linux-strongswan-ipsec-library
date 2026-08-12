@@ -57,8 +57,8 @@ make -j"$(nproc)"
 Outputs:
 
 ```text
-lib/libipsec_native.a
-lib/libipsec_native.so
+lib/zynqmp/libipsec.a
+lib/zynqmp/libipsec.so
 ```
 
 The equivalent helper is:
@@ -109,8 +109,8 @@ SYSROOT=/opt/petalinux-sdk/sysroots/aarch64-xilinx-linux \
 ## Target verification
 
 ```sh
-readelf -h libipsec_native.so
-readelf -d libipsec_native.so
+readelf -h libipsec.so
+readelf -d libipsec.so
 ./ipsec_native_app --config endpoint.conf check
 ./ipsec_native_app --config endpoint.conf status all
 ```

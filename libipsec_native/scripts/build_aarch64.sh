@@ -9,7 +9,7 @@ uiJobCount=${BUILD_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf '1')}
 acMakeArguments=(
     -C "${pcProjectDirectory}"
     -j"${uiJobCount}"
-    all
+    zynqmp
     "CROSS_COMPILE=${pcCrossCompile}"
 )
 
@@ -28,12 +28,12 @@ else
     :
 fi
 
-make -C "${pcProjectDirectory}" clean
+make -C "${pcProjectDirectory}" clean_zynqmp
 make "${acMakeArguments[@]}"
 
 "${pcCrossCompile}readelf" -h \
-    "${pcProjectDirectory}/lib/libipsec_native.so" | grep -q 'AArch64'
+    "${pcProjectDirectory}/lib/zynqmp/libipsec.so" | grep -q 'AArch64'
 
 printf 'Created AArch64 libraries:\n'
-printf '  %s\n' "${pcProjectDirectory}/lib/libipsec_native.a"
-printf '  %s\n' "${pcProjectDirectory}/lib/libipsec_native.so"
+printf '  %s\n' "${pcProjectDirectory}/lib/zynqmp/libipsec.a"
+printf '  %s\n' "${pcProjectDirectory}/lib/zynqmp/libipsec.so"

@@ -86,12 +86,12 @@ The v15 application configuration parser was executed against the repository
 fixture and the actual v15 `pc_a_initiator.conf` and `pc_b_responder.conf`;
 all three parsed and converted successfully. The `Makefile.host` dependency
 graph was also checked with the `aarch64-linux-gnu-` prefix. Its archive target
-is `./lib/libipsec_native.a`.
+is `./lib/zynqmp/libipsec.a`.
 
 ## Public repository and PetaLinux build update
 
-- GNU Make produced both `lib/libipsec_native.a` and
-  `lib/libipsec_native.so` for x86_64 Linux.
+- GNU Make produced both `lib/x86_64/libipsec.a` and
+  `lib/x86_64/libipsec.so` for x86_64 Linux.
 - The same Make dependency graph produced AArch64 ELF archives and shared
   objects with strict C11 warnings enabled.
 - The AArch64 ELF headers report `EM_AARCH64`.

@@ -1,41 +1,187 @@
 # linux-strongswan-ipsec-library
 
-Native C11 strongSwan/IPsec control and status library for Linux. The project
-uses VICI IPC to control a separately running `charon` daemon and Linux native
-interfaces to query XFRM and network state. It does not invoke `swanctl`, `ip`,
-`systemctl`, or another shell command from the library.
+Native C11 control/status library for strongSwan IKEv2/IPsec on Linux.
 
-Project sources and detailed documentation are under
-[`libipsec_native`](libipsec_native/README.md).
+The library communicates with an already running `charon` daemon through
+VICI and reads kernel status through NETLINK_XFRM, `/proc/net/xfrm_stat`, and
+NETLINK_ROUTE. It never launches `swanctl`, `ip`, `systemctl`, `tcpdump`,
+`iptables`, or another shell command.
 
-## Quick build on Ubuntu
+The product source is under `libipsec_native`. This repository is licensed
+under the Apache License 2.0. See [LICENSE](LICENSE),
+[NOTICE](libipsec_native/NOTICE), and
+[THIRD_PARTY_NOTICES.md](libipsec_native/THIRD_PARTY_NOTICES.md).
+
+## Supported scope
+
+- strongSwan 5.8.4 or newer VICI baseline
+- IKEv2 connection load, unload, and list
+- PSK load and VICI credential clear
+- IKE/CHILD initiate, terminate, rekey, and wait
+- IKE/CHILD/algorithm/daemon structured status
+- read-only XFRM state, policy, and statistics
+- read-only interface, address, and route status
+- IPv4 and IPv6 status decoding
+- x86_64 and AArch64 Linux builds
+
+`charon` must be installed, configured with the VICI and kernel-netlink
+plugins, and started by the operating system. The library does not manage the
+daemon or firewall.
+
+## Build
+
+Run build commands from the library directory:
 
 ```sh
 cd libipsec_native
-make clean
-make -j"$(nproc)"
 ```
 
-Outputs:
+CMake is the primary build system:
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+GNU Make follows separate host and ZynqMP targets:
+
+```sh
+make host
+make zynqmp
+make
+```
+
+`make host` uses `Makefile.host`; `make zynqmp` uses `Makefile.zynqmp`; and a
+plain `make` builds both. Outputs are kept separate:
 
 ```text
-libipsec_native/lib/libipsec_native.a
-libipsec_native/lib/libipsec_native.so
+lib/x86_64/libipsec.a
+lib/x86_64/libipsec.so
+lib/zynqmp/libipsec.a
+lib/zynqmp/libipsec.so
 ```
 
-## AArch64 cross build
+The host application remains an explicit target:
 
 ```sh
-cd libipsec_native
-make clean
-make -j"$(nproc)" CROSS_COMPILE=aarch64-linux-gnu-
+make -f Makefile.host app
 ```
 
-PetaLinux deployment requirements and sysroot builds are documented in
-[`docs/petalinux_compatibility.md`](libipsec_native/docs/petalinux_compatibility.md).
+The default ZynqMP tool prefix is `aarch64-linux-gnu-`:
 
-## License
+```sh
+make zynqmp CROSS_COMPILE=aarch64-linux-gnu-
+```
 
-Apache License 2.0. See [`LICENSE`](LICENSE),
-[`NOTICE`](libipsec_native/NOTICE), and
-[`THIRD_PARTY_NOTICES.md`](libipsec_native/THIRD_PARTY_NOTICES.md).
+When using a PetaLinux SDK, source its environment first. If the compiler does
+not already carry its sysroot flags, pass the target sysroot explicitly:
+
+```sh
+make zynqmp \
+  CC="$CC" AR="$AR" RANLIB="$RANLIB" \
+  SYSROOT="$SDKTARGETSYSROOT"
+```
+
+An AArch64 CMake toolchain may set:
+
+```cmake
+set(CMAKE_SYSTEM_NAME Linux)
+set(CMAKE_SYSTEM_PROCESSOR aarch64)
+set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
+```
+
+Helper scripts are also provided:
+
+```sh
+./scripts/build_ubuntu.sh
+./scripts/build_aarch64.sh
+./scripts/build_cmake_aarch64.sh
+```
+
+See [PetaLinux compatibility](libipsec_native/docs/petalinux_compatibility.md)
+for target requirements and SDK sysroot builds.
+
+Live peer integration tests are opt-in:
+
+```sh
+cmake -S . -B build-live -DIPSEC_NATIVE_BUILD_INTEGRATION_TESTS=ON
+cmake --build build-live --target test_live_ipsec
+```
+
+Read the [integration test instructions](libipsec_native/tests/integration/README.md)
+before running them on a dedicated daemon.
+
+## Usage
+
+See:
+
+- [Native CLI application](libipsec_native/apps/README.md)
+- [Public API](libipsec_native/docs/public_api.md)
+
+The `ipsec_native_app` target reuses product-relevant settings from v15
+endpoint configuration files and provides `load`, `up`, `down`, IKE/CHILD
+rekey, structured `status`, and live `loop` verification commands. It does not
+carry over v15 packet capture, traffic generation, firewall, matrix, barrier,
+or report behavior.
+
+When `pcViciSocketPath` is `NULL`, `InitializeIpsec()` attempts
+`/run/charon.vici` and then `/var/run/charon.vici`.
+
+Every `Get*()` list must be released by its matching `Free*List()` function.
+Input strings and PSK bytes are borrowed only for the duration of the call.
+PSK data is not retained in the context or written to logs.
+
+## Thread model
+
+- Different contexts are independent.
+- Calls using the same context may originate from different threads, but VICI
+  transactions are serialized internally.
+- There is no background event thread in the first implementation.
+- Logger callbacks execute on the calling thread and must not re-enter the
+  same context.
+- The caller must ensure no API call is active while `DeinitializeIpsec()`
+  runs.
+
+See [Native architecture](libipsec_native/docs/native_architecture.md) for
+details.
+
+## Runtime permissions
+
+The process needs access to the configured VICI Unix socket. XFRM dump
+availability depends on the kernel and security policy. Permission errors are
+returned as `IPSEC_ERR_PERMISSION`; the library does not require root
+unconditionally.
+
+## Dependency verification
+
+After building on Linux:
+
+```sh
+readelf -d build/libipsec.so
+ldd build/libipsec.so
+nm -D build/libipsec.so
+```
+
+Expected dynamic dependencies are libc and pthread support as provided by the
+target toolchain. There must be no `libstrongswan`, `libcharon`, or `libvici`
+dependency.
+
+The shared object uses `src/libipsec_native.map` to export only the documented
+public API. Internal VICI and Netlink parser symbols remain local.
+
+## Validation status
+
+Unit tests cover v15 endpoint configuration conversion, VICI encode/decode
+boundaries, version-tolerant `/proc/net/xfrm_stat` parsing, XFRM state/policy
+Netlink decoding, and interface/address/route Netlink decoding. Malformed and
+truncated inputs are included.
+
+The complete source, static/shared libraries, Native CLI, unit-test binaries,
+and live integration-test binary compile with C11, `-Wall`, `-Wextra`,
+`-Wpedantic`, and `-Werror` for x86_64 and AArch64 Linux. A real `charon`, peer,
+and kernel XFRM runtime are still required for target-host qualification.
+
+See [v15 analysis](libipsec_native/docs/v15_analysis.md),
+[build verification](libipsec_native/docs/build_verification.md), and
+[phase status](libipsec_native/docs/phase_status.md) for the detailed records.

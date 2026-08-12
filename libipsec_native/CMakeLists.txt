@@ -58,7 +58,7 @@ target_compile_options(ipsec_native_objects PRIVATE
 add_library(ipsec_native_static STATIC
     $<TARGET_OBJECTS:ipsec_native_objects>)
 set_target_properties(ipsec_native_static PROPERTIES
-    OUTPUT_NAME ipsec_native)
+    OUTPUT_NAME ipsec)
 target_include_directories(ipsec_native_static PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
@@ -67,7 +67,7 @@ target_link_libraries(ipsec_native_static PUBLIC Threads::Threads)
 add_library(ipsec_native_shared SHARED
     $<TARGET_OBJECTS:ipsec_native_objects>)
 set_target_properties(ipsec_native_shared PROPERTIES
-    OUTPUT_NAME ipsec_native
+    OUTPUT_NAME ipsec
     VERSION ${PROJECT_VERSION}
     SOVERSION 0)
 target_include_directories(ipsec_native_shared PUBLIC

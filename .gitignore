@@ -11,7 +11,28 @@ Thumbs.db
 /.tools/
 /.reference/
 
-# Secrets
+# Build output
+/libipsec_native/build/
+/libipsec_native/build-*/
+/libipsec_native/.host-build/
+/libipsec_native/.zynqmp-build/
+/libipsec_native/ipsec_native_app
+*.o
+*.d
+*.a
+*.so
+*.so.*
+
+# CMake in-source artifacts
+/libipsec_native/CMakeCache.txt
+/libipsec_native/CMakeFiles/
+/libipsec_native/CTestTestfile.cmake
+/libipsec_native/Testing/
+/libipsec_native/cmake_install.cmake
+/libipsec_native/compile_commands.json
+/libipsec_native/install_manifest.txt
+
+# Secrets and local configuration
 .env
 .env.*
 *.psk
@@ -21,3 +42,13 @@ Thumbs.db
 *.pk8
 *.p12
 *.pfx
+/libipsec_native/secrets/
+/libipsec_native/private/
+/libipsec_native/credentials/
+
+# Runtime output
+/libipsec_native/results/
+*.log
+*.pcap
+*.pcapng
+*.tmp

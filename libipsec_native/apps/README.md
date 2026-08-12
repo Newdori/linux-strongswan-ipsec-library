@@ -1,7 +1,7 @@
 # Native IPsec application
 
 `ipsec_native_app` is a product-oriented control and status CLI linked to
-`libipsec_native.a`. It reads the product-relevant fields from the existing v15
+`libipsec.a`. It reads the product-relevant fields from the existing v15
 `key=value` configuration files. v15 capture, UDP traffic, matrix, firewall and
 barrier settings are accepted only so the same file can be reused; those test
 features are not executed.
@@ -22,7 +22,7 @@ This creates the library under `lib` and the application in the project
 directory:
 
 ```text
-lib/libipsec_native.a
+lib/x86_64/libipsec.a
 ipsec_native_app
 ```
 

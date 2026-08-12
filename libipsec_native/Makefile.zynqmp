@@ -1,4 +1,4 @@
-CROSS_COMPILE ?=
+CROSS_COMPILE ?= aarch64-linux-gnu-
 SYSROOT ?=
 
 ifneq ($(filter default undefined,$(origin CC)),)
@@ -11,15 +11,14 @@ ifneq ($(filter default undefined,$(origin RANLIB)),)
 RANLIB = $(CROSS_COMPILE)ranlib
 endif
 
-OUTPUT_DIR ?= lib/x86_64
-BUILD_DIR ?= .host-build
+OUTPUT_DIR ?= lib/zynqmp
+BUILD_DIR ?= .zynqmp-build
 MKDIR_P ?= mkdir -p
 RM_RF ?= rm -rf
 RM_F ?= rm -f
 
 CPPFLAGS += -Iinclude
 CPPFLAGS += -Isrc/internal -Isrc/vici -Isrc/xfrm -Isrc/route
-CPPFLAGS += -Iapps
 CFLAGS += -g -O2 -std=c11
 CFLAGS += -Wall -Wextra -Wpedantic -Werror
 CFLAGS += -fPIC -D_POSIX_C_SOURCE=200809L
@@ -32,7 +31,6 @@ endif
 
 STATIC_LIBRARY = $(OUTPUT_DIR)/libipsec.a
 SHARED_LIBRARY = $(OUTPUT_DIR)/libipsec.so
-APPIPSEC = ipsec_native_app
 
 SRCIPSEC = \
 	src/core/error.c \
@@ -56,36 +54,24 @@ SRCIPSEC = \
 	src/route/interface.c \
 	src/route/route.c
 
-SRCAPP = \
-	apps/config.c \
-	apps/lifecycle.c \
-	apps/status.c \
-	apps/main.c
+OBJECTS = $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCIPSEC))
+DEPFILES = $(OBJECTS:.o=.d)
 
-OBJIPSEC = $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCIPSEC))
-OBJAPP = $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCAPP))
-DEPFILES = $(OBJIPSEC:.o=.d) $(OBJAPP:.o=.d)
-
-.PHONY: all libraries app clean
+.PHONY: all libraries clean
 
 all: libraries
 
 libraries: $(STATIC_LIBRARY) $(SHARED_LIBRARY)
 
-app: $(APPIPSEC)
-
-$(STATIC_LIBRARY): $(OBJIPSEC)
+$(STATIC_LIBRARY): $(OBJECTS)
 	@$(MKDIR_P) $(dir $@)
 	$(AR) rcs $@ $^
 	$(RANLIB) $@
 
-$(SHARED_LIBRARY): $(OBJIPSEC)
+$(SHARED_LIBRARY): $(OBJECTS)
 	@$(MKDIR_P) $(dir $@)
 	$(CC) -shared $(LDFLAGS) -Wl,-soname,libipsec.so.0 \
 		-Wl,--version-script=src/libipsec_native.map -o $@ $^ $(LDLIBS)
-
-$(APPIPSEC): $(OBJAPP) $(STATIC_LIBRARY)
-	$(CC) $(LDFLAGS) -o $@ $(OBJAPP) $(STATIC_LIBRARY) $(LDLIBS)
 
 $(BUILD_DIR)/%.o: %.c
 	@$(MKDIR_P) $(dir $@)
@@ -94,5 +80,5 @@ $(BUILD_DIR)/%.o: %.c
 -include $(DEPFILES)
 
 clean:
-	$(RM_RF) $(BUILD_DIR) $(APPIPSEC)
+	$(RM_RF) $(BUILD_DIR)
 	$(RM_F) $(STATIC_LIBRARY) $(SHARED_LIBRARY)

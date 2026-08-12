@@ -51,7 +51,6 @@ strongSwan GPL library에는 링크하지 않는다. VICI wire protocol을 독�
 libipsec_native/
 |-- CMakeLists.txt
 |-- Makefile
-|-- README.md
 |-- LICENSES.md
 |-- include/
 |   |-- ipsec.h

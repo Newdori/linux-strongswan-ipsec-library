@@ -6,9 +6,9 @@ pcScriptDirectory=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 pcProjectDirectory=$(CDPATH= cd -- "${pcScriptDirectory}/.." && pwd)
 uiJobCount=${BUILD_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf '1')}
 
-make -C "${pcProjectDirectory}" clean
-make -C "${pcProjectDirectory}" -j"${uiJobCount}" all
+make -C "${pcProjectDirectory}" clean_host
+make -C "${pcProjectDirectory}" -j"${uiJobCount}" host
 
 printf 'Created:\n'
-printf '  %s\n' "${pcProjectDirectory}/lib/libipsec_native.a"
-printf '  %s\n' "${pcProjectDirectory}/lib/libipsec_native.so"
+printf '  %s\n' "${pcProjectDirectory}/lib/x86_64/libipsec.a"
+printf '  %s\n' "${pcProjectDirectory}/lib/x86_64/libipsec.so"
