@@ -16,7 +16,7 @@ jobs:
   ubuntu:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build with GNU Make
         run: |
           make -C ipsec clean_host
@@ -29,7 +29,7 @@ jobs:
   aarch64:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install AArch64 compiler
         run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
       - name: Cross-compile with GNU Make

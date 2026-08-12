@@ -7,6 +7,22 @@ PrintUsage()
     printf 'Usage: %s [host|zynqmp|clean]\n' "${0##*/}"
 }
 
+ResolveBuildTool()
+{
+    local pcTool=$1
+    local pcResolved
+    local pcDirectory
+
+    if pcResolved=$(command -v "${pcTool}" 2>/dev/null); then
+        printf '%s\n' "${pcResolved}"
+    elif [[ -f "${pcTool}" ]]; then
+        pcDirectory=$(CDPATH= cd -- "$(dirname -- "${pcTool}")" && pwd)
+        printf '%s/%s\n' "${pcDirectory}" "$(basename -- "${pcTool}")"
+    else
+        return 1
+    fi
+}
+
 pcSourceDirectory=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 pcProjectDirectory=$(CDPATH= cd -- "${pcSourceDirectory}/.." && pwd)
 pcTarget=${1:-host}
@@ -46,12 +62,25 @@ zynqmp)
     pcArchiver=${AR:-${pcCrossCompile}ar}
     pcRanlib=${RANLIB:-${pcCrossCompile}ranlib}
 
-    if command -v "${pcCompiler}" >/dev/null 2>&1 ||
-       [[ -f "${pcCompiler}" ]]; then
-        # The selected cross compiler is available.
+    if pcCompiler=$(ResolveBuildTool "${pcCompiler}"); then
+        # The selected cross compiler was resolved to an absolute path.
         :
     else
         printf 'Cross compiler was not found: %s\n' "${pcCompiler}" >&2
+        exit 1
+    fi
+    if pcArchiver=$(ResolveBuildTool "${pcArchiver}"); then
+        # The selected archiver was resolved to an absolute path.
+        :
+    else
+        printf 'Cross archiver was not found: %s\n' "${pcArchiver}" >&2
+        exit 1
+    fi
+    if pcRanlib=$(ResolveBuildTool "${pcRanlib}"); then
+        # The selected ranlib was resolved to an absolute path.
+        :
+    else
+        printf 'Cross ranlib was not found: %s\n' "${pcRanlib}" >&2
         exit 1
     fi
 
