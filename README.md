@@ -51,14 +51,18 @@ build without executing them, or `BUILD_TESTING=OFF` to omit test targets.
 GNU Make follows separate host and ZynqMP targets:
 
 ```sh
+make -C ipsec
 make -C ipsec host
 make -C ipsec zynqmp
-make -C ipsec
+make -C ipsec clean
+make -C ipsec host clean
+make -C ipsec zynqmp clean
 ```
 
 `make -C ipsec host` uses `ipsec/Makefile.host`; `make -C ipsec zynqmp` uses
 `ipsec/Makefile.zynqmp`; and plain `make -C ipsec` builds both. Outputs are
-kept separate:
+kept separate. Plain `clean` removes both targets. Combining `clean` with
+`host` or `zynqmp` removes only the selected target and does not rebuild it.
 
 ```text
 lib/x86_64/libipsec.a
