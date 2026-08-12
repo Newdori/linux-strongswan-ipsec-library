@@ -9,7 +9,7 @@ SYSROOT ?=
 
 CPPFLAGS += -Iinclude
 CPPFLAGS += -Isrc/internal -Isrc/vici -Isrc/xfrm -Isrc/route
-CPPFLAGS += -Iapps/ipsec_native_app
+CPPFLAGS += -Iapps
 CFLAGS += -g -O2 -std=c11
 CFLAGS += -Wall -Wextra -Wpedantic -Werror
 CFLAGS += -fPIC -D_POSIX_C_SOURCE=200809L
@@ -48,10 +48,10 @@ SRCIPSEC = \
            src/route/route.c
 
 SRCAPP = \
-         apps/ipsec_native_app/config.c \
-         apps/ipsec_native_app/lifecycle.c \
-         apps/ipsec_native_app/status.c \
-         apps/ipsec_native_app/main.c
+         apps/config.c \
+         apps/lifecycle.c \
+         apps/status.c \
+         apps/main.c
 
 OBJIPSEC = $(patsubst %.c,$(OBJDIR)/%.o,$(SRCIPSEC))
 OBJAPP   = $(patsubst %.c,$(OBJDIR)/%.o,$(SRCAPP))

@@ -86,13 +86,17 @@ libipsec_native/
 |       |-- interface.c
 |       |-- address.c
 |       `-- route.c
-|-- tests/
-|   |-- unit/
-|   |-- fixtures/
-|   `-- integration/
-`-- examples/
-    |-- simple_psk.c
-    `-- show_status.c
+|-- apps/
+|   |-- app_internal.h
+|   |-- config.c
+|   |-- lifecycle.c
+|   |-- main.c
+|   |-- status.c
+|   `-- README.md
+`-- tests/
+    |-- unit/
+    |-- fixtures/
+    `-- integration/
 ```
 
 ## 4. Context와 dependency 경계

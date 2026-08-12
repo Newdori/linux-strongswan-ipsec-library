@@ -263,7 +263,7 @@ v15 network show/validation
 
 ### 아직 구현하지 않은 기능
 
-- 전체 Native library, public API, VICI, XFRM, route, examples, tests
+- 전체 Native library, public API, VICI, XFRM, route, application, tests
 
 ### 빌드 결과
 

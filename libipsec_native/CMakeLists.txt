@@ -7,7 +7,6 @@ include(CTest)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-option(IPSEC_NATIVE_BUILD_EXAMPLES "Build example applications" ON)
 option(IPSEC_NATIVE_BUILD_APPLICATION "Build the v15-compatible CLI application" ON)
 option(IPSEC_NATIVE_BUILD_INTEGRATION_TESTS
        "Build tests that require a configured live strongSwan peer" OFF)
@@ -87,27 +86,12 @@ install(FILES
     include/ipsec_types.h
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-if(IPSEC_NATIVE_BUILD_EXAMPLES)
-    add_executable(simple_psk examples/simple_psk.c)
-    add_executable(show_status examples/show_status.c)
-    foreach(IPSEC_NATIVE_EXAMPLE simple_psk show_status)
-        set_target_properties(${IPSEC_NATIVE_EXAMPLE} PROPERTIES
-            C_STANDARD 11
-            C_STANDARD_REQUIRED YES
-            C_EXTENSIONS NO)
-        target_compile_options(${IPSEC_NATIVE_EXAMPLE} PRIVATE
-            -Wall -Wextra -Wpedantic -Werror)
-        target_link_libraries(${IPSEC_NATIVE_EXAMPLE} PRIVATE
-            ipsec_native_static)
-    endforeach()
-endif()
-
 if(IPSEC_NATIVE_BUILD_APPLICATION)
     add_executable(ipsec_native_app
-        apps/ipsec_native_app/config.c
-        apps/ipsec_native_app/lifecycle.c
-        apps/ipsec_native_app/status.c
-        apps/ipsec_native_app/main.c)
+        apps/config.c
+        apps/lifecycle.c
+        apps/status.c
+        apps/main.c)
     set_target_properties(ipsec_native_app PROPERTIES
         C_STANDARD 11
         C_STANDARD_REQUIRED YES
@@ -117,14 +101,14 @@ if(IPSEC_NATIVE_BUILD_APPLICATION)
     target_compile_options(ipsec_native_app PRIVATE
         -Wall -Wextra -Wpedantic -Werror)
     target_include_directories(ipsec_native_app PRIVATE
-        apps/ipsec_native_app)
+        apps)
     target_link_libraries(ipsec_native_app PRIVATE ipsec_native_static)
 endif()
 
 if(BUILD_TESTING)
     add_executable(test_app_loop
         tests/unit/test_app_loop.c
-        apps/ipsec_native_app/lifecycle.c)
+        apps/lifecycle.c)
     set_target_properties(test_app_loop PROPERTIES
         C_STANDARD 11
         C_STANDARD_REQUIRED YES
@@ -134,12 +118,12 @@ if(BUILD_TESTING)
     target_compile_options(test_app_loop PRIVATE
         -Wall -Wextra -Wpedantic -Werror)
     target_include_directories(test_app_loop PRIVATE
-        include apps/ipsec_native_app)
+        include apps)
     add_test(NAME app_loop COMMAND test_app_loop)
 
     add_executable(test_app_config
         tests/unit/test_app_config.c
-        apps/ipsec_native_app/config.c)
+        apps/config.c)
     set_target_properties(test_app_config PROPERTIES
         C_STANDARD 11
         C_STANDARD_REQUIRED YES
@@ -149,7 +133,7 @@ if(BUILD_TESTING)
     target_compile_options(test_app_config PRIVATE
         -Wall -Wextra -Wpedantic -Werror)
     target_include_directories(test_app_config PRIVATE
-        include apps/ipsec_native_app)
+        include apps)
     add_test(NAME app_config COMMAND test_app_config
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/v15_endpoint.conf)
 

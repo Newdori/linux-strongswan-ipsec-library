@@ -23,9 +23,6 @@ Results:
 | aarch64-linux-gnu | PASS | PASS | PASS |
 
 The following consumers also compile and link for both targets:
-
-- `examples/simple_psk.c`
-- `examples/show_status.c`
 - `tests/unit/test_vici_packet.c`
 - `tests/unit/test_xfrm_stats.c`
 - `tests/unit/test_xfrm_netlink.c`
@@ -33,7 +30,7 @@ The following consumers also compile and link for both targets:
 - `tests/unit/test_app_config.c`
 - `tests/unit/test_app_loop.c`
 - `tests/integration/test_live_ipsec.c`
-- `apps/ipsec_native_app`
+- `apps/`
 - public headers included from a C++17 translation unit
 
 ## CMake verification
@@ -43,7 +40,6 @@ successfully built:
 
 - `ipsec_native_static`
 - `ipsec_native_shared`
-- both examples
 - all six unit-test targets
 - `ipsec_native_app`
 - opt-in `test_live_ipsec`
@@ -100,7 +96,7 @@ is `./lib/libipsec_native.a`.
   objects with strict C11 warnings enabled.
 - The AArch64 ELF headers report `EM_AARCH64`.
 - CMake found POSIX Threads through `Threads::Threads` and the complete
-  static/shared/examples/application/test build passed.
+  static/shared/application/test build passed.
 - The Ubuntu, AArch64 Make and AArch64 CMake helper scripts pass Bash syntax
   validation.
 - The supplied PetaLinux v15 tree was reviewed for its AArch64, strongSwan

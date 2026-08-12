@@ -68,19 +68,18 @@
   route gateway/source/OIF/metric/table/protocol/scope를 구조화한다.
 - 외부 `ip` command를 사용하지 않는다.
 
-## Phase 8 — Examples and integration test
+## Phase 8 — Application and integration test
 
 상태: 구현 및 양 architecture 링크 완료, peer 연동 실행 대기
 
-- `examples/simple_psk.c`
-- `examples/show_status.c`
+- `apps/`
 - `tests/integration/test_live_ipsec.c`
 - integration test는 dedicated charon에서 connection/PSK load, initiate,
   IKE/CHILD/XFRM show, terminate, cleanup 순서로 동작한다.
 
 ## 빌드 및 정적 검증 결과
 
-- x86_64-linux-gnu: 전체 object, `.a`, `.so`, examples, unit/integration
+- x86_64-linux-gnu: 전체 object, `.a`, `.so`, application, unit/integration
   test binaries 성공
 - aarch64-linux-gnu: 동일 범위 성공
 - flags: C11, `-Wall -Wextra -Wpedantic -Werror`, PIC

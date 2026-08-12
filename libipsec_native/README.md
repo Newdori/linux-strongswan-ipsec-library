@@ -72,8 +72,7 @@ For deployment on PetaLinux, pass its SDK sysroot instead of linking the
 shared library against a generic Ubuntu cross sysroot. See
 `docs/petalinux_compatibility.md`.
 
-The CMake examples are enabled by default. Live peer integration tests are
-opt-in:
+Live peer integration tests are opt-in:
 
     cmake -S . -B build-live \
       -DIPSEC_NATIVE_BUILD_INTEGRATION_TESTS=ON
@@ -85,9 +84,7 @@ See tests/integration/README.md before running it on a dedicated daemon.
 
 See:
 
-- examples/simple_psk.c
-- examples/show_status.c
-- apps/ipsec_native_app/README.md
+- apps/README.md
 - docs/public_api.md
 
 The `ipsec_native_app` target reuses the product-relevant settings in the v15
@@ -140,7 +137,7 @@ encode/decode boundaries, version-tolerant
 interface/address/route Netlink decoding. Malformed and truncated inputs are
 included.
 
-The full source, static/shared libraries, examples, the Native CLI, six
+The full source, static/shared libraries, the Native CLI, six
 unit-test binaries, and the live integration-test binary have been
 cross-compiled with C11,
 -Wall, -Wextra, -Wpedantic, and -Werror for x86_64 Linux and aarch64 Linux.
