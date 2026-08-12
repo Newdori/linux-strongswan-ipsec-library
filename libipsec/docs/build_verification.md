@@ -31,7 +31,7 @@ The following consumers also compile and link for both targets:
 - `tests/unit/test_app_command.c`
 - `tests/unit/test_app_loop.c`
 - `tests/integration/test_live_ipsec.c`
-- `apps/`
+- `app/`
 - public headers included from a C++17 translation unit
 
 ## CMake verification
@@ -111,7 +111,7 @@ is `./lib/zynqmp/libipsec.a`.
   warnings enabled.
 - GNU Make library object and dependency files are isolated under the
   target-specific `ipsec/obj/x86_64` and `ipsec/obj/zynqmp` directories;
-  application objects use the same layout below `apps/obj`.
+  application objects use the same layout below `app/obj`.
 - CMake found POSIX Threads through `Threads::Threads` and the complete
   static/shared/application/test build passed.
 - The Ubuntu CI invokes the GNU Make and CMake entry points directly.

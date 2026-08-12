@@ -100,10 +100,10 @@ SYSROOT=/opt/petalinux-sdk/sysroots/aarch64-xilinx-linux \
 ```sh
 readelf -h libipsec.so
 readelf -d libipsec.so
-./apps/bin/zynqmp/ipsec_app --config endpoint.conf
+./app/bin/zynqmp/ipsec_app --config endpoint.conf
 
-ipsec> status daemon
-ipsec> status all
+ipsec> show daemon
+ipsec> show all
 ```
 
 The live validation must cover VICI connection/load, PSK initiate, IKE/CHILD

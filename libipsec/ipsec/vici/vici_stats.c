@@ -74,7 +74,14 @@ static IpsecError_t CollectStatusNestedValue(
     const char *pcSection = pCollector->aacSections[0];
     IpsecError_t eError = IPSEC_OK;
 
-    if ((0 == strcmp(pcSection, "workers")) &&
+    if ((0 == strcmp(pcSection, "uptime")) &&
+        MatchStatusText(pElement->pucName, pElement->ucNameLength,
+                        "running")) {
+        eError = ParseIpsecUint64(pElement->pucValue,
+                                  pElement->usValueLength,
+                                  &pStatus->ullUptimeSeconds, 10U);
+    }
+    else if ((0 == strcmp(pcSection, "workers")) &&
         MatchStatusText(pElement->pucName, pElement->ucNameLength, "total")) {
         eError = ParseIpsecUint32(pElement->pucValue,
                                   pElement->usValueLength,

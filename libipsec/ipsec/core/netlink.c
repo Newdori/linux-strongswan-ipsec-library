@@ -185,8 +185,7 @@ static IpsecError_t ReceiveNetlinkDump(
                 else if ((0U != (pHeader->nlmsg_flags & NLM_F_DUMP_INTR))) {
                     eError = IPSEC_ERR_NETLINK_RECV;
                 }
-                else if ((uiSequence != pHeader->nlmsg_seq) ||
-                    (0U != pHeader->nlmsg_pid)) {
+                else if (uiSequence != pHeader->nlmsg_seq) {
                     eError = IPSEC_ERR_NETLINK_PARSE;
                 }
                 else if (NLMSG_DONE == pHeader->nlmsg_type) {

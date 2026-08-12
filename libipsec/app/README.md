@@ -16,21 +16,21 @@ ignored so an existing endpoint configuration can still be reused.
 From the `libipsec` directory:
 
 ```sh
-make -C apps clean_host
-make -C apps host
+make -C app clean_host
+make -C app host
 ```
 
 For ZynqMP with the default `aarch64-linux-gnu-` prefix:
 
 ```sh
-make -C apps clean_zynqmp
-make -C apps zynqmp
+make -C app clean_zynqmp
+make -C app zynqmp
 ```
 
 Override the compiler prefix and PetaLinux sysroot when required:
 
 ```sh
-make -C apps zynqmp \
+make -C app zynqmp \
     CROSS_COMPILE=aarch64-linux-gnu- \
     SYSROOT=/path/to/petalinux/sysroot
 ```
@@ -39,12 +39,12 @@ Outputs are separated by architecture:
 
 ```text
 lib/x86_64/libipsec.a
-apps/obj/x86_64/*.o
-apps/bin/x86_64/ipsec_app
+app/obj/x86_64/*.o
+app/bin/x86_64/ipsec_app
 
 lib/zynqmp/libipsec.a
-apps/obj/zynqmp/*.o
-apps/bin/zynqmp/ipsec_app
+app/obj/zynqmp/*.o
+app/bin/zynqmp/ipsec_app
 ```
 
 ## Start a session
@@ -52,13 +52,13 @@ apps/bin/zynqmp/ipsec_app
 Start with an existing v15 endpoint configuration:
 
 ```sh
-./apps/bin/x86_64/ipsec_app --config /path/pc_a_initiator.conf
+./app/bin/x86_64/ipsec_app --config /path/pc_a_initiator.conf
 ```
 
 Or connect first with the defaults and build the configuration in memory:
 
 ```sh
-./apps/bin/x86_64/ipsec_app
+./app/bin/x86_64/ipsec_app
 ```
 
 `--verbose` enables informational and debug library logs. Error and warning
@@ -91,7 +91,7 @@ child terminate [NAME]
 child rekey [NAME]
 child wait [NAME]
 
-status [SCOPE]
+show [SCOPE]
 up
 down
 test loop [--count N] [--delay-ms N] [--continue-on-error]
@@ -113,9 +113,16 @@ does not delete previously loaded daemon credentials. `credential clear` is
 daemon-wide VICI behavior and must only be used when clearing credentials
 owned by other clients is acceptable.
 
-Status scopes are `daemon`, `connections`, `ike`, `child`, `algorithms`,
-`xfrm-state`, `xfrm-policy`, `xfrm-stat`, `interfaces`, `addresses`, `routes`,
-and `all`.
+Show scopes are `summary`, `all`, `config`, `credential`, `daemon`,
+`connections`, `ike`, `child`, `algorithms`, `xfrm`, `xfrm-state`,
+`xfrm-policy`, `xfrm-stat`, `network`, `interfaces`, `addresses`, and
+`routes`. Running `show` without a scope displays `summary`.
+
+The library API can load and control multiple uniquely named connections in
+one context. This application intentionally owns one in-memory configuration
+profile per CLI session. A product that requires simultaneous one-to-many
+operation should maintain multiple profiles and call the public library API
+with unique connection and CHILD names.
 
 `up` and `down` are optional convenience commands. The independent
 `connection`, `credential`, `ike`, and `child` commands are the primary product

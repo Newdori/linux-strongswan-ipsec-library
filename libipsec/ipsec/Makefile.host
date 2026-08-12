@@ -64,7 +64,7 @@ all: libraries
 libraries: $(STATIC_LIBRARY) $(SHARED_LIBRARY)
 
 app:
-	$(MAKE) -C ../apps host CROSS_COMPILE="$(CROSS_COMPILE)" \
+	$(MAKE) -C ../app host CROSS_COMPILE="$(CROSS_COMPILE)" \
 		CC="$(CC)" SYSROOT="$(SYSROOT)"
 
 $(STATIC_LIBRARY): $(OBJIPSEC)
@@ -86,4 +86,4 @@ $(BUILD_DIR)/%.o: %.c
 clean:
 	$(RM_RF) $(BUILD_DIR)
 	$(RM_F) $(STATIC_LIBRARY) $(SHARED_LIBRARY)
-	$(MAKE) -C ../apps clean_host
+	$(MAKE) -C ../app clean_host

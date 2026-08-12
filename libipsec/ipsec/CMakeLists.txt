@@ -88,12 +88,12 @@ install(FILES
 
 if(IPSEC_NATIVE_BUILD_APPLICATION)
     add_executable(ipsec_app
-        ../apps/cli.c
-        ../apps/command.c
-        ../apps/config.c
-        ../apps/lifecycle.c
-        ../apps/status.c
-        ../apps/main.c)
+        ../app/cli.c
+        ../app/command.c
+        ../app/config.c
+        ../app/lifecycle.c
+        ../app/show.c
+        ../app/main.c)
     set_target_properties(ipsec_app PROPERTIES
         C_STANDARD 11
         C_STANDARD_REQUIRED YES
@@ -103,14 +103,14 @@ if(IPSEC_NATIVE_BUILD_APPLICATION)
     target_compile_options(ipsec_app PRIVATE
         -Wall -Wextra -Wpedantic -Werror)
     target_include_directories(ipsec_app PRIVATE
-        ../apps)
+        ../app)
     target_link_libraries(ipsec_app PRIVATE ipsec_native_static)
 endif()
 
 if(BUILD_TESTING)
     add_executable(test_app_loop
         ../tests/unit/test_app_loop.c
-        ../apps/lifecycle.c)
+        ../app/lifecycle.c)
     set_target_properties(test_app_loop PROPERTIES
         C_STANDARD 11
         C_STANDARD_REQUIRED YES
@@ -120,12 +120,12 @@ if(BUILD_TESTING)
     target_compile_options(test_app_loop PRIVATE
         -Wall -Wextra -Wpedantic -Werror)
     target_include_directories(test_app_loop PRIVATE
-        ../include ../apps)
+        ../include ../app)
     add_test(NAME app_loop COMMAND test_app_loop)
 
     add_executable(test_app_config
         ../tests/unit/test_app_config.c
-        ../apps/config.c)
+        ../app/config.c)
     set_target_properties(test_app_config PROPERTIES
         C_STANDARD 11
         C_STANDARD_REQUIRED YES
@@ -135,13 +135,13 @@ if(BUILD_TESTING)
     target_compile_options(test_app_config PRIVATE
         -Wall -Wextra -Wpedantic -Werror)
     target_include_directories(test_app_config PRIVATE
-        ../include ../apps)
+        ../include ../app)
     add_test(NAME app_config COMMAND test_app_config
         ${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/v15_endpoint.conf)
 
     add_executable(test_app_command
         ../tests/unit/test_app_command.c
-        ../apps/command.c)
+        ../app/command.c)
     set_target_properties(test_app_command PROPERTIES
         C_STANDARD 11
         C_STANDARD_REQUIRED YES
@@ -151,7 +151,7 @@ if(BUILD_TESTING)
     target_compile_options(test_app_command PRIVATE
         -Wall -Wextra -Wpedantic -Werror)
     target_include_directories(test_app_command PRIVATE
-        ../include ../apps)
+        ../include ../app)
     add_test(NAME app_command COMMAND test_app_command)
 
     add_executable(test_vici_packet

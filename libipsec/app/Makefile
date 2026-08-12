@@ -40,7 +40,7 @@ SOURCES = \
 	command.c \
 	config.c \
 	lifecycle.c \
-	status.c \
+	show.c \
 	main.c
 
 OBJECTS = $(patsubst %.c,$(OBJECT_DIR)/%.o,$(SOURCES))

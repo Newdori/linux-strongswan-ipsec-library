@@ -18,8 +18,8 @@ Thumbs.db
 /libipsec/.zynqmp-build/
 /libipsec/ipsec/obj/
 /libipsec/ipsec_app
-/libipsec/apps/obj/
-/libipsec/apps/bin/
+/libipsec/app/obj/
+/libipsec/app/bin/
 *.o
 *.d
 *.a

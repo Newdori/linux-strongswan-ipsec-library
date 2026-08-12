@@ -460,15 +460,22 @@ static IpsecError_t CollectChildValue(
                                   &pInfo->uiOutboundSpi, 16U);
     }
     else if (MatchSaText(pElement->pucName, pElement->ucNameLength, "mode")) {
-        if (MatchSaText(pElement->pucValue, pElement->usValueLength, "tunnel")) {
+        if (MatchSaText(pElement->pucValue, pElement->usValueLength,
+                        "tunnel") ||
+            MatchSaText(pElement->pucValue, pElement->usValueLength,
+                        "TUNNEL")) {
             pInfo->eMode = IPSEC_MODE_TUNNEL;
         }
         else if (MatchSaText(pElement->pucValue, pElement->usValueLength,
-                             "transport")) {
+                             "transport") ||
+                 MatchSaText(pElement->pucValue, pElement->usValueLength,
+                             "TRANSPORT")) {
             pInfo->eMode = IPSEC_MODE_TRANSPORT;
         }
         else if (MatchSaText(pElement->pucValue, pElement->usValueLength,
-                             "beet")) {
+                             "beet") ||
+                 MatchSaText(pElement->pucValue, pElement->usValueLength,
+                             "BEET")) {
             pInfo->eMode = IPSEC_MODE_BEET;
         }
         else {

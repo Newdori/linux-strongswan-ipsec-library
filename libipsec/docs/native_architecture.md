@@ -89,13 +89,13 @@ libipsec/
 |       |-- interface.c
 |       |-- address.c
 |       `-- route.c
-|-- apps/
+|-- app/
 |   |-- Makefile
 |   |-- app_internal.h
 |   |-- config.c
 |   |-- lifecycle.c
 |   |-- main.c
-|   |-- status.c
+|   |-- show.c
 |   `-- README.md
 `-- tests/
     |-- unit/

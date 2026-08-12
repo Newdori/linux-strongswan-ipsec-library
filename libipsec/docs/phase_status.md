@@ -72,7 +72,7 @@
 
 상태: 구현 및 양 architecture 링크 완료, peer 연동 실행 대기
 
-- `apps/`
+- `app/`
 - `tests/integration/test_live_ipsec.c`
 - integration test는 dedicated charon에서 connection/PSK load, initiate,
   IKE/CHILD/XFRM show, terminate, cleanup 순서로 동작한다.

@@ -73,12 +73,12 @@ GNU Make library objects are generated under `ipsec/obj/x86_64` or
 The application has separate host and ZynqMP targets:
 
 ```sh
-make -C apps host
-make -C apps zynqmp
+make -C app host
+make -C app zynqmp
 ```
 
-Application objects are generated under `apps/obj/x86_64` or
-`apps/obj/zynqmp`. Executables are generated under the matching `apps/bin`
+Application objects are generated under `app/obj/x86_64` or
+`app/obj/zynqmp`. Executables are generated under the matching `app/bin`
 directory.
 
 The default ZynqMP tool prefix is `aarch64-linux-gnu-`:
@@ -113,12 +113,12 @@ before running them on a dedicated daemon.
 
 See:
 
-- [Native CLI application](libipsec/apps/README.md)
+- [Native CLI application](libipsec/app/README.md)
 - [Public API](libipsec/docs/public_api.md)
 
 The `ipsec_app` target is a persistent interactive CLI. It connects to VICI,
 keeps a v15-compatible endpoint configuration in memory, and exposes separate
-`connection`, `credential`, `ike`, `child`, and structured `status` commands.
+`connection`, `credential`, `ike`, `child`, and structured `show` commands.
 `up` and `down` remain optional convenience commands, while lifecycle looping
 is isolated under `test loop` as an explicit verification operation. It does
 not carry over v15 packet capture, traffic generation, firewall, matrix,
@@ -130,6 +130,19 @@ When `pcViciSocketPath` is `NULL`, `InitializeIpsec()` attempts
 Every `Get*()` list must be released by its matching `Free*List()` function.
 Input strings and PSK bytes are borrowed only for the duration of the call.
 PSK data is not retained in the context or written to logs.
+
+## One-to-many operation
+
+The public library can load and control multiple uniquely named connections
+through one context. A one-to-many product keeps one configuration per peer,
+uses unique connection and CHILD names, loads the required credentials, and
+selects the target by name for initiate, rekey, and terminate operations.
+VICI transactions on one context are serialized internally.
+
+The bundled `ipsec_app` is a single-profile operator CLI. It can show every
+connection and SA known to charon, but simultaneous one-to-many profile
+ownership belongs in the integrating product application. Live one-to-many
+interoperability remains an integration-test item.
 
 ## Thread model
 

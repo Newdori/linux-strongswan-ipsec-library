@@ -64,7 +64,7 @@ all: libraries
 libraries: $(STATIC_LIBRARY) $(SHARED_LIBRARY)
 
 app:
-	$(MAKE) -C ../apps zynqmp CROSS_COMPILE="$(CROSS_COMPILE)" \
+	$(MAKE) -C ../app zynqmp CROSS_COMPILE="$(CROSS_COMPILE)" \
 		CC="$(CC)" SYSROOT="$(SYSROOT)"
 
 $(STATIC_LIBRARY): $(OBJECTS)
@@ -86,4 +86,4 @@ $(BUILD_DIR)/%.o: %.c
 clean:
 	$(RM_RF) $(BUILD_DIR)
 	$(RM_F) $(STATIC_LIBRARY) $(SHARED_LIBRARY)
-	$(MAKE) -C ../apps clean_zynqmp
+	$(MAKE) -C ../app clean_zynqmp

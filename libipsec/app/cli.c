@@ -98,14 +98,11 @@ static void PrintNativeAppHelp(void)
         "Commands:\n"
         "  config load FILE             load a v15 configuration\n"
         "  config set KEY VALUE         update one in-memory setting\n"
-        "  config show                  show in-memory settings\n"
         "  config validate              validate and rebuild settings\n"
         "  connection load              load the configured connection\n"
         "  connection unload [NAME]     unload a connection\n"
-        "  connection show              show loaded connections\n"
         "  credential load              load the configured PSK\n"
         "  credential clear             clear charon's VICI credentials\n"
-        "  credential show              show session ownership state\n"
         "  ike initiate [NAME]          initiate and wait for an IKE SA\n"
         "  ike terminate [NAME]         terminate an IKE SA\n"
         "  ike rekey [NAME]             rekey an IKE SA\n"
@@ -114,7 +111,7 @@ static void PrintNativeAppHelp(void)
         "  child terminate [NAME]       terminate a CHILD SA\n"
         "  child rekey [NAME]           rekey a CHILD SA\n"
         "  child wait [NAME]            wait for an installed CHILD SA\n"
-        "  status [SCOPE]               show Native VICI/Netlink status\n"
+        "  show [SCOPE]                 show Native VICI/Netlink information\n"
         "  up                           convenience load and initiate\n"
         "  down                         convenience terminate and unload\n"
         "  test loop [--count N] [--delay-ms N] [--continue-on-error]\n"
@@ -122,9 +119,11 @@ static void PrintNativeAppHelp(void)
         "  help                         show this command list\n"
         "  exit                         close only this client session\n"
         "\n"
-        "Status scopes:\n"
-        "  all, daemon, connections, ike, child, algorithms, xfrm-state,\n"
-        "  xfrm-policy, xfrm-stat, interfaces, addresses, routes\n"
+        "Show scopes:\n"
+        "  summary, all, config, credential, daemon, connections, ike,\n"
+        "  child, algorithms,\n"
+        "  xfrm, xfrm-state, xfrm-policy, xfrm-stat, network,\n"
+        "  interfaces, addresses, routes\n"
         "\n"
         "Configuration changes are rejected while this session owns a\n"
         "connection. PSK contents are never displayed.\n");
@@ -283,24 +282,24 @@ static void ShowNativeAppConfig(const NativeAppSession_t *pSession)
     const NativeAppConfig_t *pConfig = &pSession->Config;
 
     (void)printf(
-        "[config]\n"
-        "path=%s\n"
-        "valid=%s\n"
-        "role=%s\n"
-        "local_ip=%s\n"
-        "remote_ip=%s\n"
-        "local_id=%s\n"
-        "remote_id=%s\n"
-        "psk_file=%s\n"
-        "vici_uri=unix://%s\n"
-        "connection_name=%s\n"
-        "child_name=%s\n"
-        "ike_proposals=%s\n"
-        "esp_proposals=%s\n"
-        "ipsec_mode=%s\n"
-        "childless_ike=%s\n"
-        "terminate_on_exit=%s\n"
-        "command_timeout_ms=%" PRIu32 "\n",
+        "[CONFIGURATION]\n"
+        "  Path             : %s\n"
+        "  Valid            : %s\n"
+        "  Role             : %s\n"
+        "  Local Address    : %s\n"
+        "  Remote Address   : %s\n"
+        "  Local ID         : %s\n"
+        "  Remote ID        : %s\n"
+        "  PSK File         : %s\n"
+        "  VICI URI         : unix://%s\n"
+        "  Connection Name  : %s\n"
+        "  CHILD Name       : %s\n"
+        "  IKE Proposals    : %s\n"
+        "  ESP Proposals    : %s\n"
+        "  IPsec Mode       : %s\n"
+        "  Childless IKE    : %s\n"
+        "  Terminate On Exit: %s\n"
+        "  Command Timeout  : %" PRIu32 " ms\n",
         ('\0' != pSession->acConfigPath[0]) ? pSession->acConfigPath :
             "<memory>",
         pSession->bConfigValid ? "yes" : "no",
@@ -313,6 +312,14 @@ static void ShowNativeAppConfig(const NativeAppSession_t *pSession)
         pConfig->bChildlessIke ? "true" : "false",
         pConfig->bTerminateOnExit ? "true" : "false",
         pConfig->uiTimeoutMs);
+}
+
+static void ShowNativeAppCredential(const NativeAppSession_t *pSession)
+{
+    (void)printf("[CREDENTIAL]\n"
+                 "  Session Loaded   : %s\n"
+                 "  Secret Displayed : no\n",
+                 pSession->bCredentialLoaded ? "yes" : "no");
 }
 
 static IpsecError_t LoadNativeAppSessionConfig(
@@ -490,7 +497,8 @@ static IpsecError_t ExecuteNativeAppConnectionCommand(
     }
     else if ((2U == uiArgumentCount) &&
              (0 == strcmp("show", ppcArguments[1]))) {
-        eError = ShowNativeAppStatus(pSession->pContext, "connections");
+        eError = ShowNativeAppInformation(pSession->pContext,
+                                          "connections");
     }
     else {
         eError = IPSEC_ERR_INVALID_ARGUMENT;
@@ -528,8 +536,7 @@ static IpsecError_t ExecuteNativeAppCredentialCommand(
     }
     else if ((2U == uiArgumentCount) &&
              (0 == strcmp("show", ppcArguments[1]))) {
-        (void)printf("[credential]\nsession_loaded=%s\n",
-                     pSession->bCredentialLoaded ? "yes" : "no");
+        ShowNativeAppCredential(pSession);
         eError = IPSEC_OK;
     }
     else {
@@ -877,13 +884,25 @@ static IpsecError_t ExecuteNativeAppCommand(
                                               ppcArguments);
     }
     else if ((1U <= uiArgumentCount) &&
-             (0 == strcmp("status", ppcArguments[0]))) {
+             ((0 == strcmp("show", ppcArguments[0])) ||
+              (0 == strcmp("status", ppcArguments[0])))) {
         const char *pcScope = (2U == uiArgumentCount) ? ppcArguments[1] :
-            "all";
+            "summary";
 
-        eError = (2U >= uiArgumentCount) ?
-            ShowNativeAppStatus(pSession->pContext, pcScope) :
-            IPSEC_ERR_INVALID_ARGUMENT;
+        if (2U < uiArgumentCount) {
+            eError = IPSEC_ERR_INVALID_ARGUMENT;
+        }
+        else if (0 == strcmp("config", pcScope)) {
+            ShowNativeAppConfig(pSession);
+            eError = IPSEC_OK;
+        }
+        else if (0 == strcmp("credential", pcScope)) {
+            ShowNativeAppCredential(pSession);
+            eError = IPSEC_OK;
+        }
+        else {
+            eError = ShowNativeAppInformation(pSession->pContext, pcScope);
+        }
     }
     else if ((1U == uiArgumentCount) &&
              (0 == strcmp("up", ppcArguments[0]))) {
@@ -901,7 +920,7 @@ static IpsecError_t ExecuteNativeAppCommand(
     }
     else if ((1U == uiArgumentCount) &&
              (0 == strcmp("check", ppcArguments[0]))) {
-        eError = ShowNativeAppStatus(pSession->pContext, "daemon");
+        eError = ShowNativeAppInformation(pSession->pContext, "daemon");
     }
     else if ((1U == uiArgumentCount) &&
              (0 == strcmp("load", ppcArguments[0]))) {

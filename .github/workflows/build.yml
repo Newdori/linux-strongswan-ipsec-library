@@ -21,8 +21,8 @@ jobs:
         run: |
           make -C ipsec clean_host
           make -C ipsec host -j"$(nproc)"
-          make -C apps clean_host
-          make -C apps host -j"$(nproc)"
+          make -C app clean_host
+          make -C app host -j"$(nproc)"
       - name: Build and test with CMake
         run: ./ipsec/cmake_build.sh host
 
@@ -37,8 +37,8 @@ jobs:
           make -C ipsec clean_zynqmp
           make -C ipsec zynqmp -j"$(nproc)" \
             CROSS_COMPILE=aarch64-linux-gnu-
-          make -C apps clean_zynqmp
-          make -C apps zynqmp -j"$(nproc)"
+          make -C app clean_zynqmp
+          make -C app zynqmp -j"$(nproc)"
       - name: Cross-compile with CMake
         run: BUILD_TESTING=OFF ./ipsec/cmake_build.sh zynqmp
       - name: Verify architecture

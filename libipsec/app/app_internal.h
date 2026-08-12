@@ -121,7 +121,7 @@ IpsecError_t RunNativeAppLoop(
     NativeAppRuntimeConfig_t *pRuntime,
     const NativeAppLoopOptions_t *pOptions);
 
-IpsecError_t ShowNativeAppStatus(
+IpsecError_t ShowNativeAppInformation(
     IpsecContext_t *pContext,
     const char *pcScope);
 

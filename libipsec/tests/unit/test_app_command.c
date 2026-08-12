@@ -49,7 +49,7 @@ static int32_t CheckNativeAppCommand(
 
 int main(void)
 {
-    static const char *const pacStatus[] = {"status", "all"};
+    static const char *const pacShow[] = {"show", "all"};
     static const char *const pacConfigLoad[] = {
         "config", "load", "/tmp/config file.conf"
     };
@@ -69,7 +69,7 @@ int main(void)
     uint32_t uiArgumentCount = 0U;
     uint32_t uiValue = 0U;
 
-    if ((0 != CheckNativeAppCommand("  status all  \n", 2U, pacStatus)) ||
+    if ((0 != CheckNativeAppCommand("  show all  \n", 2U, pacShow)) ||
         (0 != CheckNativeAppCommand(
                   "config load '/tmp/config file.conf'", 3U,
                   pacConfigLoad)) ||
