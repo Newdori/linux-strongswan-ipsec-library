@@ -1,0 +1,82 @@
+DIR_TOP ?= .
+
+CROSS_COMPILE ?=
+CC      = $(CROSS_COMPILE)gcc
+AR      = $(CROSS_COMPILE)ar
+ARFLAGS = rcsv
+RANLIB  = $(CROSS_COMPILE)ranlib
+SYSROOT ?=
+
+CPPFLAGS += -Iinclude
+CPPFLAGS += -Isrc/internal -Isrc/vici -Isrc/xfrm -Isrc/route
+CPPFLAGS += -Iapps/ipsec_native_app
+CFLAGS += -g -O2 -std=c11
+CFLAGS += -Wall -Wextra -Wpedantic -Werror
+CFLAGS += -fPIC -D_POSIX_C_SOURCE=200809L
+LDLIBS += -lpthread
+
+ifneq ($(strip $(SYSROOT)),)
+CPPFLAGS += --sysroot=$(SYSROOT)
+LDFLAGS += --sysroot=$(SYSROOT)
+endif
+
+LIBDIR   = lib
+LIBIPSEC = $(LIBDIR)/libipsec_native.a
+APPIPSEC = ipsec_native_app
+OBJDIR   = .host-build
+
+SRCIPSEC = \
+           src/core/error.c \
+           src/core/ipsec.c \
+           src/core/log.c \
+           src/core/netlink.c \
+           src/core/util.c \
+           src/vici/vici_algorithm.c \
+           src/vici/vici_client.c \
+           src/vici/vici_connection.c \
+           src/vici/vici_credential.c \
+           src/vici/vici_packet.c \
+           src/vici/vici_parser.c \
+           src/vici/vici_sa.c \
+           src/vici/vici_stats.c \
+           src/vici/vici_transport.c \
+           src/xfrm/xfrm_policy.c \
+           src/xfrm/xfrm_state.c \
+           src/xfrm/xfrm_stats.c \
+           src/route/address.c \
+           src/route/interface.c \
+           src/route/route.c
+
+SRCAPP = \
+         apps/ipsec_native_app/config.c \
+         apps/ipsec_native_app/lifecycle.c \
+         apps/ipsec_native_app/status.c \
+         apps/ipsec_native_app/main.c
+
+OBJIPSEC = $(patsubst %.c,$(OBJDIR)/%.o,$(SRCIPSEC))
+OBJAPP   = $(patsubst %.c,$(OBJDIR)/%.o,$(SRCAPP))
+DEPFILES = $(OBJIPSEC:.o=.d) $(OBJAPP:.o=.d)
+
+.PHONY: all app clean
+
+all: $(LIBIPSEC)
+
+app: $(APPIPSEC)
+
+$(LIBIPSEC): $(OBJIPSEC)
+	@mkdir -p $(dir $@)
+	$(AR) $(ARFLAGS) $@ $^
+	$(RANLIB) $@
+
+$(APPIPSEC): $(OBJAPP) $(LIBIPSEC)
+	$(CC) $(LDFLAGS) -o $@ $(OBJAPP) $(LIBIPSEC) $(LDLIBS)
+
+$(OBJDIR)/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -MP -o $@ -c $<
+
+-include $(DEPFILES)
+
+clean:
+	rm -rf $(OBJDIR) $(APPIPSEC)
+	rm -f $(LIBIPSEC)

@@ -1,0 +1,222 @@
+cmake_minimum_required(VERSION 3.16)
+
+project(ipsec_native VERSION 0.1.0 LANGUAGES C)
+
+include(GNUInstallDirs)
+include(CTest)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
+option(IPSEC_NATIVE_BUILD_EXAMPLES "Build example applications" ON)
+option(IPSEC_NATIVE_BUILD_APPLICATION "Build the v15-compatible CLI application" ON)
+option(IPSEC_NATIVE_BUILD_INTEGRATION_TESTS
+       "Build tests that require a configured live strongSwan peer" OFF)
+
+set(IPSEC_NATIVE_SOURCES
+    src/core/error.c
+    src/core/ipsec.c
+    src/core/log.c
+    src/core/netlink.c
+    src/core/util.c
+    src/vici/vici_algorithm.c
+    src/vici/vici_client.c
+    src/vici/vici_connection.c
+    src/vici/vici_credential.c
+    src/vici/vici_packet.c
+    src/vici/vici_parser.c
+    src/vici/vici_sa.c
+    src/vici/vici_stats.c
+    src/vici/vici_transport.c
+    src/xfrm/xfrm_policy.c
+    src/xfrm/xfrm_state.c
+    src/xfrm/xfrm_stats.c
+    src/route/address.c
+    src/route/interface.c
+    src/route/route.c)
+
+add_library(ipsec_native_objects OBJECT ${IPSEC_NATIVE_SOURCES})
+set_target_properties(ipsec_native_objects PROPERTIES
+    C_STANDARD 11
+    C_STANDARD_REQUIRED YES
+    C_EXTENSIONS NO
+    POSITION_INDEPENDENT_CODE YES)
+target_include_directories(ipsec_native_objects
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/internal
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/vici
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/xfrm
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/route)
+target_compile_definitions(ipsec_native_objects PRIVATE
+    _POSIX_C_SOURCE=200809L)
+target_compile_options(ipsec_native_objects PRIVATE
+    -Wall
+    -Wextra
+    -Wpedantic
+    -Werror)
+
+add_library(ipsec_native_static STATIC
+    $<TARGET_OBJECTS:ipsec_native_objects>)
+set_target_properties(ipsec_native_static PROPERTIES
+    OUTPUT_NAME ipsec_native)
+target_include_directories(ipsec_native_static PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_link_libraries(ipsec_native_static PUBLIC Threads::Threads)
+
+add_library(ipsec_native_shared SHARED
+    $<TARGET_OBJECTS:ipsec_native_objects>)
+set_target_properties(ipsec_native_shared PROPERTIES
+    OUTPUT_NAME ipsec_native
+    VERSION ${PROJECT_VERSION}
+    SOVERSION 0)
+target_include_directories(ipsec_native_shared PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_link_libraries(ipsec_native_shared PUBLIC Threads::Threads)
+target_link_options(ipsec_native_shared PRIVATE
+    "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/src/libipsec_native.map")
+
+install(TARGETS ipsec_native_static ipsec_native_shared
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES
+    include/ipsec.h
+    include/ipsec_error.h
+    include/ipsec_types.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+if(IPSEC_NATIVE_BUILD_EXAMPLES)
+    add_executable(simple_psk examples/simple_psk.c)
+    add_executable(show_status examples/show_status.c)
+    foreach(IPSEC_NATIVE_EXAMPLE simple_psk show_status)
+        set_target_properties(${IPSEC_NATIVE_EXAMPLE} PROPERTIES
+            C_STANDARD 11
+            C_STANDARD_REQUIRED YES
+            C_EXTENSIONS NO)
+        target_compile_options(${IPSEC_NATIVE_EXAMPLE} PRIVATE
+            -Wall -Wextra -Wpedantic -Werror)
+        target_link_libraries(${IPSEC_NATIVE_EXAMPLE} PRIVATE
+            ipsec_native_static)
+    endforeach()
+endif()
+
+if(IPSEC_NATIVE_BUILD_APPLICATION)
+    add_executable(ipsec_native_app
+        apps/ipsec_native_app/config.c
+        apps/ipsec_native_app/lifecycle.c
+        apps/ipsec_native_app/status.c
+        apps/ipsec_native_app/main.c)
+    set_target_properties(ipsec_native_app PROPERTIES
+        C_STANDARD 11
+        C_STANDARD_REQUIRED YES
+        C_EXTENSIONS NO)
+    target_compile_definitions(ipsec_native_app PRIVATE
+        _POSIX_C_SOURCE=200809L)
+    target_compile_options(ipsec_native_app PRIVATE
+        -Wall -Wextra -Wpedantic -Werror)
+    target_include_directories(ipsec_native_app PRIVATE
+        apps/ipsec_native_app)
+    target_link_libraries(ipsec_native_app PRIVATE ipsec_native_static)
+endif()
+
+if(BUILD_TESTING)
+    add_executable(test_app_loop
+        tests/unit/test_app_loop.c
+        apps/ipsec_native_app/lifecycle.c)
+    set_target_properties(test_app_loop PROPERTIES
+        C_STANDARD 11
+        C_STANDARD_REQUIRED YES
+        C_EXTENSIONS NO)
+    target_compile_definitions(test_app_loop PRIVATE
+        _POSIX_C_SOURCE=200809L)
+    target_compile_options(test_app_loop PRIVATE
+        -Wall -Wextra -Wpedantic -Werror)
+    target_include_directories(test_app_loop PRIVATE
+        include apps/ipsec_native_app)
+    add_test(NAME app_loop COMMAND test_app_loop)
+
+    add_executable(test_app_config
+        tests/unit/test_app_config.c
+        apps/ipsec_native_app/config.c)
+    set_target_properties(test_app_config PROPERTIES
+        C_STANDARD 11
+        C_STANDARD_REQUIRED YES
+        C_EXTENSIONS NO)
+    target_compile_definitions(test_app_config PRIVATE
+        _POSIX_C_SOURCE=200809L)
+    target_compile_options(test_app_config PRIVATE
+        -Wall -Wextra -Wpedantic -Werror)
+    target_include_directories(test_app_config PRIVATE
+        include apps/ipsec_native_app)
+    add_test(NAME app_config COMMAND test_app_config
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/v15_endpoint.conf)
+
+    add_executable(test_vici_packet
+        tests/unit/test_vici_packet.c
+        src/core/util.c
+        src/vici/vici_packet.c
+        src/vici/vici_parser.c)
+    set_target_properties(test_vici_packet PROPERTIES
+        C_STANDARD 11
+        C_STANDARD_REQUIRED YES
+        C_EXTENSIONS NO)
+    target_compile_definitions(test_vici_packet PRIVATE
+        _POSIX_C_SOURCE=200809L)
+    target_compile_options(test_vici_packet PRIVATE
+        -Wall -Wextra -Wpedantic -Werror)
+    target_include_directories(test_vici_packet PRIVATE
+        include src/internal src/vici)
+    target_link_libraries(test_vici_packet PRIVATE Threads::Threads)
+    add_test(NAME vici_packet COMMAND test_vici_packet)
+
+    add_executable(test_xfrm_stats
+        tests/unit/test_xfrm_stats.c
+        src/core/util.c
+        src/xfrm/xfrm_stats.c)
+    set_target_properties(test_xfrm_stats PROPERTIES
+        C_STANDARD 11
+        C_STANDARD_REQUIRED YES
+        C_EXTENSIONS NO)
+    target_compile_definitions(test_xfrm_stats PRIVATE
+        _POSIX_C_SOURCE=200809L)
+    target_compile_options(test_xfrm_stats PRIVATE
+        -Wall -Wextra -Wpedantic -Werror)
+    target_include_directories(test_xfrm_stats PRIVATE
+        include src/internal src/xfrm)
+    target_link_libraries(test_xfrm_stats PRIVATE Threads::Threads)
+    add_test(NAME xfrm_stats COMMAND test_xfrm_stats)
+
+    add_executable(test_xfrm_netlink
+        tests/unit/test_xfrm_netlink.c)
+    add_executable(test_route_netlink
+        tests/unit/test_route_netlink.c)
+    foreach(IPSEC_NATIVE_NETLINK_TEST test_xfrm_netlink test_route_netlink)
+        set_target_properties(${IPSEC_NATIVE_NETLINK_TEST} PROPERTIES
+            C_STANDARD 11
+            C_STANDARD_REQUIRED YES
+            C_EXTENSIONS NO)
+        target_compile_options(${IPSEC_NATIVE_NETLINK_TEST} PRIVATE
+            -Wall -Wextra -Wpedantic -Werror)
+        target_include_directories(${IPSEC_NATIVE_NETLINK_TEST} PRIVATE
+            include src/internal src/xfrm src/route)
+        target_link_libraries(${IPSEC_NATIVE_NETLINK_TEST} PRIVATE
+            ipsec_native_static)
+    endforeach()
+    add_test(NAME xfrm_netlink COMMAND test_xfrm_netlink)
+    add_test(NAME route_netlink COMMAND test_route_netlink)
+
+    if(IPSEC_NATIVE_BUILD_INTEGRATION_TESTS)
+        add_executable(test_live_ipsec tests/integration/test_live_ipsec.c)
+        set_target_properties(test_live_ipsec PROPERTIES
+            C_STANDARD 11
+            C_STANDARD_REQUIRED YES
+            C_EXTENSIONS NO)
+        target_compile_definitions(test_live_ipsec PRIVATE
+            _POSIX_C_SOURCE=200809L)
+        target_compile_options(test_live_ipsec PRIVATE
+            -Wall -Wextra -Wpedantic -Werror)
+        target_link_libraries(test_live_ipsec PRIVATE ipsec_native_static)
+    endif()
+endif()

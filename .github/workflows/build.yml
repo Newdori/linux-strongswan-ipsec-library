@@ -1,0 +1,39 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+    working-directory: libipsec_native
+
+jobs:
+  ubuntu:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build with GNU Make
+        run: |
+          make clean
+          make all -j"$(nproc)"
+      - name: Build and test with CMake
+        run: |
+          cmake -S . -B build/cmake -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/cmake --parallel "$(nproc)"
+          ctest --test-dir build/cmake --output-on-failure
+
+  aarch64:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install AArch64 compiler
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+      - name: Cross-compile with GNU Make
+        run: ./scripts/build_aarch64.sh
+      - name: Verify architecture
+        run: aarch64-linux-gnu-readelf -h lib/libipsec_native.so | grep AArch64

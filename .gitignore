@@ -1,0 +1,23 @@
+# Operating system and editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Local tools and references
+/.tools/
+/.reference/
+
+# Secrets
+.env
+.env.*
+*.psk
+*.key
+*.pem
+*.p8
+*.pk8
+*.p12
+*.pfx
