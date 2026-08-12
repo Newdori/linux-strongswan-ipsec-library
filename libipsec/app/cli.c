@@ -111,7 +111,10 @@ static void PrintNativeAppHelp(void)
         "  child terminate [NAME]       terminate a CHILD SA\n"
         "  child rekey [NAME]           rekey a CHILD SA\n"
         "  child wait [NAME]            wait for an installed CHILD SA\n"
-        "  show [SCOPE]                 show Native VICI/Netlink information\n"
+        "  show [SCOPE]                 show a compact table (summary default)\n"
+        "  show {connections|ike|child} detail [NAME]\n"
+        "                               show every field, optionally by name\n"
+        "  show SCOPE [NAME]            filter a compact named-object table\n"
         "  up                           convenience load and initiate\n"
         "  down                         convenience terminate and unload\n"
         "  test loop [--count N] [--delay-ms N] [--continue-on-error]\n"
@@ -124,6 +127,7 @@ static void PrintNativeAppHelp(void)
         "  child, algorithms,\n"
         "  xfrm, xfrm-state, xfrm-policy, xfrm-stat, network,\n"
         "  interfaces, addresses, routes\n"
+        "  NAME filtering is supported for connections, ike, and child.\n"
         "\n"
         "Configuration changes are rejected while this session owns a\n"
         "connection. PSK contents are never displayed.\n");
@@ -498,7 +502,7 @@ static IpsecError_t ExecuteNativeAppConnectionCommand(
     else if ((2U == uiArgumentCount) &&
              (0 == strcmp("show", ppcArguments[1]))) {
         eError = ShowNativeAppInformation(pSession->pContext,
-                                          "connections");
+                                          "connections", false, NULL);
     }
     else {
         eError = IPSEC_ERR_INVALID_ARGUMENT;
@@ -886,22 +890,32 @@ static IpsecError_t ExecuteNativeAppCommand(
     else if ((1U <= uiArgumentCount) &&
              ((0 == strcmp("show", ppcArguments[0])) ||
               (0 == strcmp("status", ppcArguments[0])))) {
-        const char *pcScope = (2U == uiArgumentCount) ? ppcArguments[1] :
-            "summary";
+        NativeAppShowOptions_t Options = {0};
 
-        if (2U < uiArgumentCount) {
+        if (!ParseNativeAppShowOptions(uiArgumentCount, ppcArguments,
+                                       &Options)) {
             eError = IPSEC_ERR_INVALID_ARGUMENT;
         }
-        else if (0 == strcmp("config", pcScope)) {
+        else {
+            eError = IPSEC_OK;
+        }
+        if ((IPSEC_OK == eError) &&
+            (0 == strcmp("config", Options.pcScope))) {
             ShowNativeAppConfig(pSession);
             eError = IPSEC_OK;
         }
-        else if (0 == strcmp("credential", pcScope)) {
+        else if ((IPSEC_OK == eError) &&
+                 (0 == strcmp("credential", Options.pcScope))) {
             ShowNativeAppCredential(pSession);
             eError = IPSEC_OK;
         }
+        else if (IPSEC_OK == eError) {
+            eError = ShowNativeAppInformation(
+                pSession->pContext, Options.pcScope, Options.bDetail,
+                Options.pcName);
+        }
         else {
-            eError = ShowNativeAppInformation(pSession->pContext, pcScope);
+            /* Preserve the argument parsing error. */
         }
     }
     else if ((1U == uiArgumentCount) &&
@@ -920,7 +934,8 @@ static IpsecError_t ExecuteNativeAppCommand(
     }
     else if ((1U == uiArgumentCount) &&
              (0 == strcmp("check", ppcArguments[0]))) {
-        eError = ShowNativeAppInformation(pSession->pContext, "daemon");
+        eError = ShowNativeAppInformation(pSession->pContext, "daemon",
+                                          false, NULL);
     }
     else if ((1U == uiArgumentCount) &&
              (0 == strcmp("load", ppcArguments[0]))) {

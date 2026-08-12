@@ -73,29 +73,98 @@ static IpsecError_t ShowNativeAppDaemon(IpsecContext_t *pContext)
     return eError;
 }
 
-static IpsecError_t ShowNativeAppConnections(IpsecContext_t *pContext)
+static bool IsNativeAppItemSelected(
+    const char *pcFilter,
+    const char *pcPrimaryName,
+    const char *pcSecondaryName)
+{
+    bool bSelected;
+
+    if (NULL == pcFilter) {
+        bSelected = true;
+    }
+    else if ((NULL != pcPrimaryName) &&
+             (0 == strcmp(pcFilter, pcPrimaryName))) {
+        bSelected = true;
+    }
+    else if ((NULL != pcSecondaryName) &&
+             (0 == strcmp(pcFilter, pcSecondaryName))) {
+        bSelected = true;
+    }
+    else {
+        bSelected = false;
+    }
+    return bSelected;
+}
+
+static IpsecError_t ShowNativeAppConnections(
+    IpsecContext_t *pContext,
+    bool bDetail,
+    const char *pcName)
 {
     IpsecConnectionList_t List = {0};
     IpsecError_t eError = GetIpsecConnections(pContext, &List);
     uint32_t uiIndex;
+    uint32_t uiMatchCount = 0U;
+    uint32_t uiDisplayIndex = 0U;
 
     if (IPSEC_OK == eError) {
+        for (uiIndex = 0U; uiIndex < List.uiCount; uiIndex++) {
+            if (IsNativeAppItemSelected(pcName, List.pItems[uiIndex].acName,
+                                        NULL)) {
+                uiMatchCount++;
+            }
+            else {
+                /* This connection does not match the optional filter. */
+            }
+        }
         (void)printf("[CONNECTIONS]\n  Count            : %" PRIu32 "\n",
-                     List.uiCount);
+                     uiMatchCount);
+        if (!bDetail) {
+            (void)printf(
+                "  No. Name                 Local Address           "
+                "Remote Address          Remote ID            Children\n"
+                "  --- -------------------- ----------------------- "
+                "----------------------- -------------------- "
+                "--------------------\n");
+        }
+        else {
+            /* Detailed records are printed below. */
+        }
         for (uiIndex = 0U; uiIndex < List.uiCount; uiIndex++) {
             const IpsecConnectionInfo_t *pItem = &List.pItems[uiIndex];
 
-            (void)printf("\n[CONNECTION %" PRIu32 "/%" PRIu32 "]\n"
-                         "  Name             : %s\n"
-                         "  Local Address    : %s\n"
-                         "  Remote Address   : %s\n"
-                         "  Local ID         : %s\n"
-                         "  Remote ID        : %s\n"
-                         "  Children         : %s\n",
-                         uiIndex + 1U, List.uiCount,
-                         pItem->acName, pItem->acLocalAddresses,
-                         pItem->acRemoteAddresses, pItem->acLocalId,
-                         pItem->acRemoteId, pItem->acChildNames);
+            if (!IsNativeAppItemSelected(pcName, pItem->acName, NULL)) {
+                continue;
+            }
+            else {
+                uiDisplayIndex++;
+            }
+            if (bDetail) {
+                (void)printf(
+                    "\n[CONNECTION %" PRIu32 "/%" PRIu32 "]\n"
+                    "  Name             : %s\n"
+                    "  Local Address    : %s\n"
+                    "  Remote Address   : %s\n"
+                    "  Local ID         : %s\n"
+                    "  Remote ID        : %s\n"
+                    "  Children         : %s\n"
+                    "  Rekey Time       : %" PRIu64 " ms\n"
+                    "  Reauth Time      : %" PRIu64 " ms\n",
+                    uiDisplayIndex, uiMatchCount, pItem->acName,
+                    pItem->acLocalAddresses, pItem->acRemoteAddresses,
+                    pItem->acLocalId, pItem->acRemoteId,
+                    pItem->acChildNames, pItem->ullRekeyTimeMs,
+                    pItem->ullReauthTimeMs);
+            }
+            else {
+                (void)printf(
+                    "  %3" PRIu32 " %-20.20s %-23.23s %-23.23s "
+                    "%-20.20s %-20.20s\n",
+                    uiDisplayIndex, pItem->acName,
+                    pItem->acLocalAddresses, pItem->acRemoteAddresses,
+                    pItem->acRemoteId, pItem->acChildNames);
+            }
         }
     }
     else {
@@ -105,36 +174,87 @@ static IpsecError_t ShowNativeAppConnections(IpsecContext_t *pContext)
     return eError;
 }
 
-static IpsecError_t ShowNativeAppIkeSas(IpsecContext_t *pContext)
+static IpsecError_t ShowNativeAppIkeSas(
+    IpsecContext_t *pContext,
+    bool bDetail,
+    const char *pcName)
 {
     IpsecIkeSaList_t List = {0};
     IpsecError_t eError = GetIpsecIkeSas(pContext, &List);
     uint32_t uiIndex;
+    uint32_t uiMatchCount = 0U;
+    uint32_t uiDisplayIndex = 0U;
 
     if (IPSEC_OK == eError) {
+        for (uiIndex = 0U; uiIndex < List.uiCount; uiIndex++) {
+            if (IsNativeAppItemSelected(pcName, List.pItems[uiIndex].acName,
+                                        NULL)) {
+                uiMatchCount++;
+            }
+            else {
+                /* This IKE SA does not match the optional filter. */
+            }
+        }
         (void)printf("[IKE SAs]\n  Count            : %" PRIu32 "\n",
-                     List.uiCount);
+                     uiMatchCount);
+        if (!bDetail) {
+            (void)printf(
+                "  No. Name                 Unique ID  State        Role      "
+                "Local                   Remote                  Remote ID\n"
+                "  --- -------------------- ---------- ------------ --------- "
+                "----------------------- ----------------------- "
+                "--------------------\n");
+        }
+        else {
+            /* Detailed records are printed below. */
+        }
         for (uiIndex = 0U; uiIndex < List.uiCount; uiIndex++) {
             const IpsecIkeSaInfo_t *pItem = &List.pItems[uiIndex];
 
-            (void)printf("\n[IKE SA %" PRIu32 "/%" PRIu32 "]\n"
-                         "  Name             : %s\n"
-                         "  State            : %s\n"
-                         "  Established      : %s\n"
-                         "  Role             : %s\n"
-                         "  Local            : %s (%s)\n"
-                         "  Remote           : %s (%s)\n"
-                         "  Proposal         : %s\n"
-                         "  NAT              : local=%s, remote=%s\n",
-                         uiIndex + 1U, List.uiCount,
-                         pItem->acName, pItem->acState,
-                         pItem->bEstablished ? "yes" : "no",
-                         pItem->bInitiator ? "initiator" : "responder",
-                         pItem->acLocalAddress, pItem->acRemoteAddress,
-                         pItem->acLocalId, pItem->acRemoteId,
-                         pItem->acProposal,
-                         pItem->bNatLocal ? "yes" : "no",
-                         pItem->bNatRemote ? "yes" : "no");
+            if (!IsNativeAppItemSelected(pcName, pItem->acName, NULL)) {
+                continue;
+            }
+            else {
+                uiDisplayIndex++;
+            }
+            if (bDetail) {
+                (void)printf(
+                    "\n[IKE SA %" PRIu32 "/%" PRIu32 "]\n"
+                    "  Name             : %s\n"
+                    "  Unique ID        : %" PRIu64 "\n"
+                    "  State            : %s\n"
+                    "  Established      : %s\n"
+                    "  Role             : %s\n"
+                    "  Local Address    : %s\n"
+                    "  Remote Address   : %s\n"
+                    "  Local ID         : %s\n"
+                    "  Remote ID        : %s\n"
+                    "  Proposal         : %s\n"
+                    "  NAT Local        : %s\n"
+                    "  NAT Remote       : %s\n"
+                    "  Established Time : %" PRIu64 " ms\n"
+                    "  Rekey Time       : %" PRIu64 " ms\n",
+                    uiDisplayIndex, uiMatchCount, pItem->acName,
+                    pItem->ullUniqueId, pItem->acState,
+                    pItem->bEstablished ? "yes" : "no",
+                    pItem->bInitiator ? "initiator" : "responder",
+                    pItem->acLocalAddress, pItem->acRemoteAddress,
+                    pItem->acLocalId, pItem->acRemoteId, pItem->acProposal,
+                    pItem->bNatLocal ? "yes" : "no",
+                    pItem->bNatRemote ? "yes" : "no",
+                    pItem->ullEstablishedTimeMs, pItem->ullRekeyTimeMs);
+            }
+            else {
+                (void)printf(
+                    "  %3" PRIu32 " %-20.20s %10" PRIu64
+                    " %-12.12s %-9s %-23.23s "
+                    "%-23.23s %-20.20s\n",
+                    uiDisplayIndex, pItem->acName, pItem->ullUniqueId,
+                    pItem->acState,
+                    pItem->bInitiator ? "initiator" : "responder",
+                    pItem->acLocalAddress, pItem->acRemoteAddress,
+                    pItem->acRemoteId);
+            }
         }
     }
     else {
@@ -144,45 +264,95 @@ static IpsecError_t ShowNativeAppIkeSas(IpsecContext_t *pContext)
     return eError;
 }
 
-static IpsecError_t ShowNativeAppChildSas(IpsecContext_t *pContext)
+static IpsecError_t ShowNativeAppChildSas(
+    IpsecContext_t *pContext,
+    bool bDetail,
+    const char *pcName)
 {
     IpsecChildSaList_t List = {0};
     IpsecError_t eError = GetIpsecChildSas(pContext, &List);
     uint32_t uiIndex;
+    uint32_t uiMatchCount = 0U;
+    uint32_t uiDisplayIndex = 0U;
 
     if (IPSEC_OK == eError) {
+        for (uiIndex = 0U; uiIndex < List.uiCount; uiIndex++) {
+            if (IsNativeAppItemSelected(pcName, List.pItems[uiIndex].acName,
+                                        List.pItems[uiIndex].acIkeName)) {
+                uiMatchCount++;
+            }
+            else {
+                /* This CHILD SA does not match the optional filter. */
+            }
+        }
         (void)printf("[CHILD SAs]\n  Count            : %" PRIu32 "\n",
-                     List.uiCount);
+                     uiMatchCount);
+        if (!bDetail) {
+            (void)printf(
+                "  No. Name                 IKE                  State      "
+                "Mode       ReqID    SPI In     SPI Out    Pkts In  Pkts Out\n"
+                "  --- -------------------- -------------------- ---------- "
+                "---------- -------- ---------- ---------- -------- --------\n");
+        }
+        else {
+            /* Detailed records are printed below. */
+        }
         for (uiIndex = 0U; uiIndex < List.uiCount; uiIndex++) {
             const IpsecChildSaInfo_t *pItem = &List.pItems[uiIndex];
 
-            (void)printf("\n[CHILD SA %" PRIu32 "/%" PRIu32 "]\n"
-                         "  IKE Name         : %s\n"
-                         "  Name             : %s\n"
-                         "  State            : %s\n"
-                         "  Mode             : %s\n"
-                         "  ReqID            : %" PRIu32 "\n"
-                         "  Inbound SPI      : 0x%08" PRIx32 "\n"
-                         "  Outbound SPI     : 0x%08" PRIx32 "\n"
-                         "  Proposal         : %s\n"
-                         "  ESN              : %s\n"
-                         "  UDP Encapsulation: %s\n"
-                         "  Local TS         : %s\n"
-                         "  Remote TS        : %s\n"
-                         "  Inbound Traffic  : %" PRIu64
-                         " packets, %" PRIu64 " bytes\n"
-                         "  Outbound Traffic : %" PRIu64
-                         " packets, %" PRIu64 " bytes\n",
-                         uiIndex + 1U, List.uiCount,
-                         pItem->acIkeName, pItem->acName, pItem->acState,
-                         GetNativeAppMode(pItem->eMode), pItem->uiReqid,
-                         pItem->uiInboundSpi, pItem->uiOutboundSpi,
-                         pItem->acProposal, pItem->bEsn ? "yes" : "no",
-                         pItem->bUdpEncapsulation ? "yes" : "no",
-                         pItem->acLocalTrafficSelectors,
-                         pItem->acRemoteTrafficSelectors,
-                         pItem->ullPacketsIn, pItem->ullBytesIn,
-                         pItem->ullPacketsOut, pItem->ullBytesOut);
+            if (!IsNativeAppItemSelected(pcName, pItem->acName,
+                                         pItem->acIkeName)) {
+                continue;
+            }
+            else {
+                uiDisplayIndex++;
+            }
+            if (bDetail) {
+                (void)printf(
+                    "\n[CHILD SA %" PRIu32 "/%" PRIu32 "]\n"
+                    "  IKE Name         : %s\n"
+                    "  Name             : %s\n"
+                    "  State            : %s\n"
+                    "  Mode             : %s\n"
+                    "  ReqID            : %" PRIu32 "\n"
+                    "  Inbound SPI      : 0x%08" PRIx32 "\n"
+                    "  Outbound SPI     : 0x%08" PRIx32 "\n"
+                    "  Proposal         : %s\n"
+                    "  ESN              : %s\n"
+                    "  UDP Encapsulation: %s\n"
+                    "  Local TS         : %s\n"
+                    "  Remote TS        : %s\n"
+                    "  Inbound Traffic  : %" PRIu64
+                    " packets, %" PRIu64 " bytes\n"
+                    "  Outbound Traffic : %" PRIu64
+                    " packets, %" PRIu64 " bytes\n"
+                    "  Install Time     : %" PRIu64 " ms\n"
+                    "  Rekey Time       : %" PRIu64 " ms\n"
+                    "  Lifetime         : %" PRIu64 " ms\n",
+                    uiDisplayIndex, uiMatchCount, pItem->acIkeName,
+                    pItem->acName, pItem->acState,
+                    GetNativeAppMode(pItem->eMode), pItem->uiReqid,
+                    pItem->uiInboundSpi, pItem->uiOutboundSpi,
+                    pItem->acProposal, pItem->bEsn ? "yes" : "no",
+                    pItem->bUdpEncapsulation ? "yes" : "no",
+                    pItem->acLocalTrafficSelectors,
+                    pItem->acRemoteTrafficSelectors,
+                    pItem->ullPacketsIn, pItem->ullBytesIn,
+                    pItem->ullPacketsOut, pItem->ullBytesOut,
+                    pItem->ullInstallTimeMs, pItem->ullRekeyTimeMs,
+                    pItem->ullLifetimeMs);
+            }
+            else {
+                (void)printf(
+                    "  %3" PRIu32 " %-20.20s %-20.20s %-10.10s "
+                    "%-10.10s %8" PRIu32 " 0x%08" PRIx32
+                    " 0x%08" PRIx32 " %8" PRIu64 " %8" PRIu64 "\n",
+                    uiDisplayIndex, pItem->acName, pItem->acIkeName,
+                    pItem->acState, GetNativeAppMode(pItem->eMode),
+                    pItem->uiReqid, pItem->uiInboundSpi,
+                    pItem->uiOutboundSpi, pItem->ullPacketsIn,
+                    pItem->ullPacketsOut);
+            }
         }
     }
     else {
@@ -471,7 +641,9 @@ static void RecordNativeAppShowError(
 
 IpsecError_t ShowNativeAppInformation(
     IpsecContext_t *pContext,
-    const char *pcScope)
+    const char *pcScope,
+    bool bDetail,
+    const char *pcName)
 {
     IpsecError_t eFirstError = IPSEC_OK;
     bool bAll;
@@ -507,6 +679,15 @@ IpsecError_t ShowNativeAppInformation(
     else {
         /* Run the requested section or every section. */
     }
+    if ((NULL != pcName) &&
+        (0 != strcmp("connections", pcScope)) &&
+        (0 != strcmp("ike", pcScope)) &&
+        (0 != strcmp("child", pcScope))) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    else {
+        /* Name filters apply only to named VICI objects. */
+    }
 
     if (bAll || bSummary || (0 == strcmp("daemon", pcScope))) {
         RecordNativeAppShowError("DAEMON", ShowNativeAppDaemon(pContext),
@@ -514,16 +695,20 @@ IpsecError_t ShowNativeAppInformation(
     }
     if (bAll || bSummary || (0 == strcmp("connections", pcScope))) {
         RecordNativeAppShowError("CONNECTIONS",
-                                 ShowNativeAppConnections(pContext),
+                                 ShowNativeAppConnections(pContext, bDetail,
+                                                          pcName),
                                  &eFirstError);
     }
     if (bAll || bSummary || (0 == strcmp("ike", pcScope))) {
-        RecordNativeAppShowError("IKE SAs", ShowNativeAppIkeSas(pContext),
+        RecordNativeAppShowError("IKE SAs",
+                                 ShowNativeAppIkeSas(pContext, bDetail,
+                                                     pcName),
                                  &eFirstError);
     }
     if (bAll || bSummary || (0 == strcmp("child", pcScope))) {
         RecordNativeAppShowError("CHILD SAs",
-                                 ShowNativeAppChildSas(pContext),
+                                 ShowNativeAppChildSas(pContext, bDetail,
+                                                       pcName),
                                  &eFirstError);
     }
     if (bAll || (0 == strcmp("algorithms", pcScope))) {

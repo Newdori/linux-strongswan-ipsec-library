@@ -144,6 +144,11 @@ connection and SA known to charon, but simultaneous one-to-many profile
 ownership belongs in the integrating product application. Live one-to-many
 interoperability remains an integration-test item.
 
+For operator visibility, `show connections`, `show ike`, and `show child`
+render compact one-row-per-object tables. Add `detail` for all available
+fields, and optionally add an object name to isolate one peer, for example
+`show ike detail peer-a` or `show child peer-a-child`.
+
 ## Thread model
 
 - Different contexts are independent.

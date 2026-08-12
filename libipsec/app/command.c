@@ -3,6 +3,70 @@
 #include <ctype.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <string.h>
+
+static bool IsNativeAppNamedShowScope(const char *pcScope)
+{
+    return (0 == strcmp("connections", pcScope)) ||
+           (0 == strcmp("ike", pcScope)) ||
+           (0 == strcmp("child", pcScope));
+}
+
+static bool IsNativeAppDetailedShowScope(const char *pcScope)
+{
+    return IsNativeAppNamedShowScope(pcScope) ||
+           (0 == strcmp("all", pcScope)) ||
+           (0 == strcmp("summary", pcScope));
+}
+
+bool ParseNativeAppShowOptions(
+    uint32_t uiArgumentCount,
+    char **ppcArguments,
+    NativeAppShowOptions_t *pOptions)
+{
+    bool bParsed = true;
+
+    if ((0U == uiArgumentCount) || (4U < uiArgumentCount) ||
+        (NULL == ppcArguments) || (NULL == pOptions)) {
+        bParsed = false;
+    }
+    else {
+        (void)memset(pOptions, 0, sizeof(*pOptions));
+        pOptions->pcScope = (2U <= uiArgumentCount) ? ppcArguments[1] :
+            "summary";
+    }
+    if (bParsed && (3U <= uiArgumentCount) &&
+        (0 == strcmp("detail", ppcArguments[2]))) {
+        pOptions->bDetail = true;
+        if (4U == uiArgumentCount) {
+            pOptions->pcName = ppcArguments[3];
+        }
+        else {
+            /* Detail output is not filtered by name. */
+        }
+    }
+    else if (bParsed && (3U == uiArgumentCount)) {
+        pOptions->pcName = ppcArguments[2];
+    }
+    else if (bParsed && (3U < uiArgumentCount)) {
+        bParsed = false;
+    }
+    else {
+        /* No optional output mode or name was supplied. */
+    }
+    if (bParsed && pOptions->bDetail &&
+        !IsNativeAppDetailedShowScope(pOptions->pcScope)) {
+        bParsed = false;
+    }
+    else if (bParsed && (NULL != pOptions->pcName) &&
+             !IsNativeAppNamedShowScope(pOptions->pcScope)) {
+        bParsed = false;
+    }
+    else {
+        /* The parsed option combination is supported. */
+    }
+    return bParsed;
+}
 
 bool ParseNativeAppNumber(
     const char *pcText,

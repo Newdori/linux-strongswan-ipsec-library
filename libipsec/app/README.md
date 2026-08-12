@@ -92,6 +92,8 @@ child rekey [NAME]
 child wait [NAME]
 
 show [SCOPE]
+show SCOPE detail [NAME]
+show SCOPE [NAME]
 up
 down
 test loop [--count N] [--delay-ms N] [--continue-on-error]
@@ -117,6 +119,25 @@ Show scopes are `summary`, `all`, `config`, `credential`, `daemon`,
 `connections`, `ike`, `child`, `algorithms`, `xfrm`, `xfrm-state`,
 `xfrm-policy`, `xfrm-stat`, `network`, `interfaces`, `addresses`, and
 `routes`. Running `show` without a scope displays `summary`.
+
+`show connections`, `show ike`, and `show child` use one-row-per-object tables
+so that simultaneous peers can be compared without scrolling through record
+blocks. Use `detail` to display every field represented by the corresponding
+public result structure. Examples:
+
+```text
+show
+show ike
+show ike app-test
+show ike detail
+show ike detail app-test
+show child detail app-test-child
+```
+
+The optional name filters `connections` and `ike` by their object name.
+`child` accepts either a CHILD name or its parent IKE name. Long values are
+visually truncated only in compact tables; `detail` always prints the complete
+value held by the library.
 
 The library API can load and control multiple uniquely named connections in
 one context. This application intentionally owns one in-memory configuration

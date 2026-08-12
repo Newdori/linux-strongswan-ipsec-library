@@ -53,6 +53,12 @@ typedef struct NativeAppRuntimeConfig {
     const char *pacEspProposals[NATIVE_APP_PROPOSAL_COUNT];
 } NativeAppRuntimeConfig_t;
 
+typedef struct NativeAppShowOptions {
+    const char *pcScope;
+    const char *pcName;
+    bool bDetail;
+} NativeAppShowOptions_t;
+
 typedef struct NativeAppSecret {
     uint8_t *pucData;
     uint32_t uiLength;
@@ -123,7 +129,9 @@ IpsecError_t RunNativeAppLoop(
 
 IpsecError_t ShowNativeAppInformation(
     IpsecContext_t *pContext,
-    const char *pcScope);
+    const char *pcScope,
+    bool bDetail,
+    const char *pcName);
 
 void RequestNativeAppStop(void);
 
@@ -138,6 +146,11 @@ bool ParseNativeAppCommandLine(
 bool ParseNativeAppNumber(
     const char *pcText,
     uint32_t *puiValue);
+
+bool ParseNativeAppShowOptions(
+    uint32_t uiArgumentCount,
+    char **ppcArguments,
+    NativeAppShowOptions_t *pOptions);
 
 int32_t RunNativeAppCli(
     int32_t iArgumentCount,
