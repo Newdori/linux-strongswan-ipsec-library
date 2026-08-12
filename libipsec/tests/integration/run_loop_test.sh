@@ -12,5 +12,5 @@ uiCount=${2:-100}
 uiDelayMs=${3:-500}
 pcApplication=${IPSEC_APP:-./apps/bin/x86_64/ipsec_app}
 
-exec "$pcApplication" --config "$pcConfig" loop \
+exec "$pcApplication" --config "$pcConfig" test loop \
     --count "$uiCount" --delay-ms "$uiDelayMs"

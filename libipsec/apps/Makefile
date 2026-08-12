@@ -36,6 +36,8 @@ OUTPUT_DIR = bin/$(TARGET)
 APPLICATION = $(OUTPUT_DIR)/ipsec_app
 
 SOURCES = \
+	cli.c \
+	command.c \
 	config.c \
 	lifecycle.c \
 	status.c \

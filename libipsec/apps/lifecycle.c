@@ -14,6 +14,11 @@ void RequestNativeAppStop(void)
     gbNativeAppStopRequested = 1;
 }
 
+void ResetNativeAppStopRequest(void)
+{
+    gbNativeAppStopRequested = 0;
+}
+
 static void SleepNativeApp(uint32_t uiMilliseconds)
 {
     struct timespec Time;
@@ -26,7 +31,7 @@ static void SleepNativeApp(uint32_t uiMilliseconds)
     }
 }
 
-static IpsecError_t AddNativeAppPsk(
+IpsecError_t LoadNativeAppCredential(
     IpsecContext_t *pContext,
     const NativeAppConfig_t *pConfig)
 {
@@ -68,7 +73,7 @@ IpsecError_t LoadNativeAppResources(
         eError = AddIpsecConnection(pContext, &pRuntime->Connection);
     }
     if (IPSEC_OK == eError) {
-        eError = AddNativeAppPsk(pContext, pConfig);
+        eError = LoadNativeAppCredential(pContext, pConfig);
     }
     else {
         /* Preserve the connection error. */
@@ -389,7 +394,7 @@ IpsecError_t RunNativeAppLoop(
     else {
         Control.uiTimeoutMs = pConfig->uiTimeoutMs;
     }
-    eError = AddNativeAppPsk(pContext, pConfig);
+    eError = LoadNativeAppCredential(pContext, pConfig);
     if (IPSEC_OK != eError) {
         return eError;
     }

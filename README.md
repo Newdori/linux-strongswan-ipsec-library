@@ -116,11 +116,13 @@ See:
 - [Native CLI application](libipsec/apps/README.md)
 - [Public API](libipsec/docs/public_api.md)
 
-The `ipsec_app` target reuses product-relevant settings from v15
-endpoint configuration files and provides `load`, `up`, `down`, IKE/CHILD
-rekey, structured `status`, and live `loop` verification commands. It does not
-carry over v15 packet capture, traffic generation, firewall, matrix, barrier,
-or report behavior.
+The `ipsec_app` target is a persistent interactive CLI. It connects to VICI,
+keeps a v15-compatible endpoint configuration in memory, and exposes separate
+`connection`, `credential`, `ike`, `child`, and structured `status` commands.
+`up` and `down` remain optional convenience commands, while lifecycle looping
+is isolated under `test loop` as an explicit verification operation. It does
+not carry over v15 packet capture, traffic generation, firewall, matrix,
+barrier, or report behavior.
 
 When `pcViciSocketPath` is `NULL`, `InitializeIpsec()` attempts
 `/run/charon.vici` and then `/var/run/charon.vici`.

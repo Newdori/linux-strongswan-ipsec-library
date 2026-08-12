@@ -28,6 +28,7 @@ The following consumers also compile and link for both targets:
 - `tests/unit/test_xfrm_netlink.c`
 - `tests/unit/test_route_netlink.c`
 - `tests/unit/test_app_config.c`
+- `tests/unit/test_app_command.c`
 - `tests/unit/test_app_loop.c`
 - `tests/integration/test_live_ipsec.c`
 - `apps/`
@@ -40,7 +41,7 @@ successfully built:
 
 - `ipsec_native_static`
 - `ipsec_native_shared`
-- all six unit-test targets
+- all seven unit-test targets
 - `ipsec_app`
 - opt-in `test_live_ipsec`
 
@@ -58,6 +59,7 @@ test-only compatibility headers:
 | VICI packet encode/decode and malformed boundaries | PASS |
 | `/proc/net/xfrm_stat` key/value and malformed input | PASS |
 | v15 endpoint configuration parse/convert (fixture and two actual configs) | PASS |
+| interactive CLI command tokenizer and number validation | PASS |
 | application lifecycle mock loop, 25 iterations | PASS |
 
 The compatibility headers under `tests/host/` are not part of product targets.
@@ -94,7 +96,7 @@ is `./lib/zynqmp/libipsec.a`.
   build entry points now reside under `libipsec/ipsec`.
 - GNU Make host and ZynqMP library builds, both application builds, and the
   complete CMake target graph compile successfully from the relocated paths.
-- CMake registers all six unit tests. The Windows verification host cannot
+- CMake registers all seven unit tests. The Windows verification host cannot
   execute the generated Linux ELF test binaries; execution remains covered by
   the Ubuntu CI job and target-host validation.
 - GNU Make produced both `lib/x86_64/libipsec.a` and
@@ -104,6 +106,9 @@ is `./lib/zynqmp/libipsec.a`.
 - The AArch64 ELF headers report `EM_AARCH64`.
 - The application Makefile produced x86_64 and AArch64 executables through
   its `host` and `zynqmp` targets.
+- The interactive application sources, including the session dispatcher and
+  quoted command parser, compile and link for both architectures with strict
+  warnings enabled.
 - GNU Make library object and dependency files are isolated under the
   target-specific `ipsec/obj/x86_64` and `ipsec/obj/zynqmp` directories;
   application objects use the same layout below `apps/obj`.

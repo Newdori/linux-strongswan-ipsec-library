@@ -11,6 +11,8 @@
 #define NATIVE_APP_PROPOSAL_COUNT           32U
 #define NATIVE_APP_ERROR_TEXT_LENGTH       256U
 #define NATIVE_APP_PSK_MAX_LENGTH        65535U
+#define NATIVE_APP_COMMAND_LINE_LENGTH     2048U
+#define NATIVE_APP_COMMAND_ARGUMENT_COUNT    32U
 
 typedef enum NativeAppRole {
     NATIVE_APP_ROLE_INITIATOR = 0,
@@ -65,6 +67,16 @@ typedef struct NativeAppLoopOptions {
 
 void InitializeNativeAppConfig(NativeAppConfig_t *pConfig);
 
+IpsecError_t SetNativeAppConfigSetting(
+    NativeAppConfig_t *pConfig,
+    const char *pcKey,
+    const char *pcValue);
+
+IpsecError_t ValidateNativeAppConfig(
+    const NativeAppConfig_t *pConfig,
+    char *pcError,
+    uint32_t uiErrorLength);
+
 IpsecError_t LoadNativeAppConfig(
     const char *pcPath,
     NativeAppConfig_t *pConfig,
@@ -82,6 +94,10 @@ IpsecError_t ReadNativeAppSecret(
     NativeAppSecret_t *pSecret);
 
 void DestroyNativeAppSecret(NativeAppSecret_t *pSecret);
+
+IpsecError_t LoadNativeAppCredential(
+    IpsecContext_t *pContext,
+    const NativeAppConfig_t *pConfig);
 
 IpsecError_t LoadNativeAppResources(
     IpsecContext_t *pContext,
@@ -110,5 +126,21 @@ IpsecError_t ShowNativeAppStatus(
     const char *pcScope);
 
 void RequestNativeAppStop(void);
+
+void ResetNativeAppStopRequest(void);
+
+bool ParseNativeAppCommandLine(
+    char *pcLine,
+    char **ppcArguments,
+    uint32_t uiArgumentCapacity,
+    uint32_t *puiArgumentCount);
+
+bool ParseNativeAppNumber(
+    const char *pcText,
+    uint32_t *puiValue);
+
+int32_t RunNativeAppCli(
+    int32_t iArgumentCount,
+    char **ppcArguments);
 
 #endif

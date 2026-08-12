@@ -17,6 +17,16 @@ int main(int iArgumentCount, char **ppcArguments)
     IpsecError_t eError;
     int32_t iIndex;
 
+    InitializeNativeAppConfig(&Config);
+    eError = SetNativeAppConfigSetting(&Config, "vici_uri", "");
+    if ((IPSEC_OK != eError) ||
+        (0 != strcmp("/run/charon.vici", Config.acViciSocket))) {
+        return FailAppConfigTest("empty vici_uri did not select the default");
+    }
+    else {
+        /* Continue with the supplied complete configurations. */
+    }
+
     if (2 > iArgumentCount) {
         return FailAppConfigTest("one or more configuration paths are required");
     }

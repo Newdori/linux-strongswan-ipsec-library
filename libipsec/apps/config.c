@@ -126,7 +126,7 @@ static bool IsNativeAppIgnoredV15Key(const char *pcKey)
     return bFound;
 }
 
-static IpsecError_t SetNativeAppConfigValue(
+IpsecError_t SetNativeAppConfigSetting(
     NativeAppConfig_t *pConfig,
     const char *pcKey,
     const char *pcValue)
@@ -167,7 +167,10 @@ static IpsecError_t SetNativeAppConfigValue(
     else if (0 == strcmp("vici_uri", pcKey)) {
         const char *pcPath = pcValue;
 
-        if (0 == strncmp("unix://", pcValue, 7U)) {
+        if ('\0' == pcValue[0]) {
+            pcPath = "/run/charon.vici";
+        }
+        else if (0 == strncmp("unix://", pcValue, 7U)) {
             pcPath = pcValue + 7U;
         }
         else if ('/' == pcValue[0]) {
@@ -248,7 +251,7 @@ static bool IsNativeAppAddressValid(const char *pcAddress)
            (1 == inet_pton(AF_INET6, pcAddress, aucBuffer));
 }
 
-static IpsecError_t ValidateNativeAppConfig(
+IpsecError_t ValidateNativeAppConfig(
     const NativeAppConfig_t *pConfig,
     char *pcError,
     uint32_t uiErrorLength)
@@ -379,7 +382,7 @@ IpsecError_t LoadNativeAppConfig(
         }
         pcValue = TrimNativeAppText(pcSeparator + 1U);
         pcKey = TrimNativeAppText(pcKey);
-        eError = SetNativeAppConfigValue(pConfig, pcKey, pcValue);
+        eError = SetNativeAppConfigSetting(pConfig, pcKey, pcValue);
         if (IPSEC_OK != eError) {
             SetNativeAppError(pcError, uiErrorLength,
                               "unknown or invalid setting: %s", pcKey);

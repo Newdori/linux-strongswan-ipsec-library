@@ -88,6 +88,8 @@ install(FILES
 
 if(IPSEC_NATIVE_BUILD_APPLICATION)
     add_executable(ipsec_app
+        ../apps/cli.c
+        ../apps/command.c
         ../apps/config.c
         ../apps/lifecycle.c
         ../apps/status.c
@@ -136,6 +138,21 @@ if(BUILD_TESTING)
         ../include ../apps)
     add_test(NAME app_config COMMAND test_app_config
         ${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/v15_endpoint.conf)
+
+    add_executable(test_app_command
+        ../tests/unit/test_app_command.c
+        ../apps/command.c)
+    set_target_properties(test_app_command PROPERTIES
+        C_STANDARD 11
+        C_STANDARD_REQUIRED YES
+        C_EXTENSIONS NO)
+    target_compile_definitions(test_app_command PRIVATE
+        _POSIX_C_SOURCE=200809L)
+    target_compile_options(test_app_command PRIVATE
+        -Wall -Wextra -Wpedantic -Werror)
+    target_include_directories(test_app_command PRIVATE
+        ../include ../apps)
+    add_test(NAME app_command COMMAND test_app_command)
 
     add_executable(test_vici_packet
         ../tests/unit/test_vici_packet.c
