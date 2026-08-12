@@ -36,13 +36,17 @@ Run build commands from the library directory:
 cd libipsec
 ```
 
-CMake is the primary build system:
+CMake is the primary build system. One script supports host and ZynqMP builds:
 
 ```sh
-cmake -S ipsec -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-ctest --test-dir build --output-on-failure
+./build.sh
+./build.sh zynqmp
+./build.sh clean
 ```
+
+Host and ZynqMP outputs are isolated under `build/host` and `build/zynqmp`.
+The host build runs registered unit tests by default. Set `RUN_TESTS=OFF` to
+build without executing them, or `BUILD_TESTING=OFF` to omit test targets.
 
 GNU Make follows separate host and ZynqMP targets:
 
@@ -92,22 +96,13 @@ make -C ipsec zynqmp \
   SYSROOT="$SDKTARGETSYSROOT"
 ```
 
-An AArch64 CMake toolchain may set:
-
-```cmake
-set(CMAKE_SYSTEM_NAME Linux)
-set(CMAKE_SYSTEM_PROCESSOR aarch64)
-set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
-```
-
 See [PetaLinux compatibility](libipsec/docs/petalinux_compatibility.md)
 for target requirements and SDK sysroot builds.
 
 Live peer integration tests are opt-in:
 
 ```sh
-cmake -S ipsec -B build-live -DIPSEC_NATIVE_BUILD_INTEGRATION_TESTS=ON
-cmake --build build-live --target test_live_ipsec
+IPSEC_NATIVE_BUILD_INTEGRATION_TESTS=ON RUN_TESTS=OFF ./build.sh
 ```
 
 Read the [integration test instructions](libipsec/tests/integration/README.md)

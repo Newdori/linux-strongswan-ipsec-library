@@ -8,8 +8,7 @@ do not use a production daemon.
 
 Configure and build:
 
-    cmake -S ipsec -B build -DIPSEC_NATIVE_BUILD_INTEGRATION_TESTS=ON
-    cmake --build build --target test_live_ipsec
+    IPSEC_NATIVE_BUILD_INTEGRATION_TESTS=ON RUN_TESTS=OFF ./build.sh host
 
 Required environment variables:
 
@@ -29,7 +28,7 @@ Optional socket override:
 
 Execute:
 
-    ./build/test_live_ipsec
+    ./build/host/test_live_ipsec
 
 The test returns 77 when required environment is absent. PSK data is never
 printed, but environment variables can be visible to privileged processes;

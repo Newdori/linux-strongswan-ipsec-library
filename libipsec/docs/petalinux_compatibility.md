@@ -88,14 +88,11 @@ If the PetaLinux SDK environment exports a complete `CC`, `AR` and `RANLIB`,
 they may be passed directly on the Make command line instead. Do not mix host
 headers with a target sysroot.
 
-For CMake:
+For CMake, the single build script selects the ZynqMP cross build:
 
 ```sh
-cmake -S ipsec -B build/aarch64 \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_TOOLCHAIN_FILE=ipsec/cmake/toolchains/aarch64-linux-gnu.cmake \
-    -DCMAKE_SYSROOT=/opt/petalinux-sdk/sysroots/aarch64-xilinx-linux
-cmake --build build/aarch64 --parallel "$(nproc)"
+SYSROOT=/opt/petalinux-sdk/sysroots/aarch64-xilinx-linux \
+    ./build.sh zynqmp
 ```
 
 ## Target verification

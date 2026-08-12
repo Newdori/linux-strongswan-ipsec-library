@@ -24,10 +24,7 @@ jobs:
           make -C apps clean_host
           make -C apps host -j"$(nproc)"
       - name: Build and test with CMake
-        run: |
-          cmake -S ipsec -B build/cmake -DCMAKE_BUILD_TYPE=Release
-          cmake --build build/cmake --parallel "$(nproc)"
-          ctest --test-dir build/cmake --output-on-failure
+        run: ./build.sh host
 
   aarch64:
     runs-on: ubuntu-22.04
@@ -42,5 +39,9 @@ jobs:
             CROSS_COMPILE=aarch64-linux-gnu-
           make -C apps clean_zynqmp
           make -C apps zynqmp -j"$(nproc)"
+      - name: Cross-compile with CMake
+        run: BUILD_TESTING=OFF ./build.sh zynqmp
       - name: Verify architecture
-        run: aarch64-linux-gnu-readelf -h lib/zynqmp/libipsec.so | grep AArch64
+        run: |
+          aarch64-linux-gnu-readelf -h lib/zynqmp/libipsec.so | grep AArch64
+          aarch64-linux-gnu-readelf -h build/zynqmp/libipsec.so | grep AArch64
