@@ -104,13 +104,12 @@ is `./lib/zynqmp/libipsec.a`.
 - The AArch64 ELF headers report `EM_AARCH64`.
 - The application Makefile produced x86_64 and AArch64 executables through
   its `host` and `zynqmp` targets.
-- GNU Make object and dependency files are isolated under the target-specific
-  `obj/x86_64` and `obj/zynqmp` directories; application objects use the same
-  layout below `apps/obj`.
+- GNU Make library object and dependency files are isolated under the
+  target-specific `ipsec/obj/x86_64` and `ipsec/obj/zynqmp` directories;
+  application objects use the same layout below `apps/obj`.
 - CMake found POSIX Threads through `Threads::Threads` and the complete
   static/shared/application/test build passed.
-- The Ubuntu, AArch64 Make and AArch64 CMake helper scripts pass Bash syntax
-  validation.
+- The Ubuntu CI invokes the GNU Make and CMake entry points directly.
 - The supplied PetaLinux v15 tree was reviewed for its AArch64, strongSwan
   5.8.4, VICI socket and rootfs expectations. See
   `docs/petalinux_compatibility.md`.

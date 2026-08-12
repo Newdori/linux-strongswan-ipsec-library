@@ -61,12 +61,6 @@ lib/x86_64/libipsec.a
 lib/x86_64/libipsec.so
 ```
 
-The equivalent helper is:
-
-```sh
-./scripts/build_ubuntu.sh
-```
-
 ## Generic AArch64 cross build
 
 ```sh
@@ -74,12 +68,6 @@ sudo apt-get install gcc-aarch64-linux-gnu
 make -C ipsec clean_zynqmp
 make -C ipsec zynqmp -j"$(nproc)" \
     CROSS_COMPILE=aarch64-linux-gnu-
-```
-
-or:
-
-```sh
-./scripts/build_aarch64.sh
 ```
 
 ## PetaLinux sysroot build
@@ -103,8 +91,11 @@ headers with a target sysroot.
 For CMake:
 
 ```sh
-SYSROOT=/opt/petalinux-sdk/sysroots/aarch64-xilinx-linux \
-    ./scripts/build_cmake_aarch64.sh
+cmake -S ipsec -B build/aarch64 \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_TOOLCHAIN_FILE=ipsec/cmake/toolchains/aarch64-linux-gnu.cmake \
+    -DCMAKE_SYSROOT=/opt/petalinux-sdk/sysroots/aarch64-xilinx-linux
+cmake --build build/aarch64 --parallel "$(nproc)"
 ```
 
 ## Target verification

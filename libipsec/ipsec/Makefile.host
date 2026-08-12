@@ -12,7 +12,7 @@ RANLIB = $(CROSS_COMPILE)ranlib
 endif
 
 OUTPUT_DIR ?= ../lib/x86_64
-BUILD_DIR ?= ../obj/x86_64
+BUILD_DIR ?= obj/x86_64
 MKDIR_P ?= mkdir -p
 RM_RF ?= rm -rf
 RM_F ?= rm -f

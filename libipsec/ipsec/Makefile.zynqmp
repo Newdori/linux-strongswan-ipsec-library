@@ -12,7 +12,7 @@ RANLIB = $(CROSS_COMPILE)ranlib
 endif
 
 OUTPUT_DIR ?= ../lib/zynqmp
-BUILD_DIR ?= ../obj/zynqmp
+BUILD_DIR ?= obj/zynqmp
 MKDIR_P ?= mkdir -p
 RM_RF ?= rm -rf
 RM_F ?= rm -f

@@ -37,7 +37,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
       - name: Cross-compile with GNU Make
         run: |
-          ./scripts/build_aarch64.sh
+          make -C ipsec clean_zynqmp
+          make -C ipsec zynqmp -j"$(nproc)" \
+            CROSS_COMPILE=aarch64-linux-gnu-
           make -C apps clean_zynqmp
           make -C apps zynqmp -j"$(nproc)"
       - name: Verify architecture

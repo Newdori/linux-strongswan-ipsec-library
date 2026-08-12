@@ -63,8 +63,8 @@ lib/zynqmp/libipsec.a
 lib/zynqmp/libipsec.so
 ```
 
-GNU Make library objects are generated under `libipsec/obj/x86_64` or
-`libipsec/obj/zynqmp`.
+GNU Make library objects are generated under `ipsec/obj/x86_64` or
+`ipsec/obj/zynqmp`.
 
 The application has separate host and ZynqMP targets:
 
@@ -98,14 +98,6 @@ An AArch64 CMake toolchain may set:
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR aarch64)
 set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
-```
-
-Helper scripts are also provided:
-
-```sh
-./scripts/build_ubuntu.sh
-./scripts/build_aarch64.sh
-./scripts/build_cmake_aarch64.sh
 ```
 
 See [PetaLinux compatibility](libipsec/docs/petalinux_compatibility.md)
