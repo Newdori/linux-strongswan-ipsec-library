@@ -7,7 +7,8 @@ PrintUsage()
     printf 'Usage: %s [host|zynqmp|clean]\n' "${0##*/}"
 }
 
-pcProjectDirectory=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+pcSourceDirectory=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+pcProjectDirectory=$(CDPATH= cd -- "${pcSourceDirectory}/.." && pwd)
 pcTarget=${1:-host}
 pcBuildType=${BUILD_TYPE:-Release}
 pcCrossCompile=${CROSS_COMPILE:-aarch64-linux-gnu-}
@@ -83,7 +84,7 @@ clean)
 esac
 
 acCmakeArguments+=(
-    -S "${pcProjectDirectory}/ipsec"
+    -S "${pcSourceDirectory}"
     -B "${pcBuildDirectory}"
     "-DCMAKE_BUILD_TYPE=${pcBuildType}"
     "-DBUILD_TESTING=${bBuildTesting}"

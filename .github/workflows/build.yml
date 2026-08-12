@@ -24,7 +24,7 @@ jobs:
           make -C apps clean_host
           make -C apps host -j"$(nproc)"
       - name: Build and test with CMake
-        run: ./build.sh host
+        run: ./ipsec/cmake_build.sh host
 
   aarch64:
     runs-on: ubuntu-22.04
@@ -40,7 +40,7 @@ jobs:
           make -C apps clean_zynqmp
           make -C apps zynqmp -j"$(nproc)"
       - name: Cross-compile with CMake
-        run: BUILD_TESTING=OFF ./build.sh zynqmp
+        run: BUILD_TESTING=OFF ./ipsec/cmake_build.sh zynqmp
       - name: Verify architecture
         run: |
           aarch64-linux-gnu-readelf -h lib/zynqmp/libipsec.so | grep AArch64

@@ -92,7 +92,7 @@ For CMake, the single build script selects the ZynqMP cross build:
 
 ```sh
 SYSROOT=/opt/petalinux-sdk/sysroots/aarch64-xilinx-linux \
-    ./build.sh zynqmp
+    ./ipsec/cmake_build.sh zynqmp
 ```
 
 ## Target verification

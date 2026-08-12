@@ -8,7 +8,8 @@ do not use a production daemon.
 
 Configure and build:
 
-    IPSEC_NATIVE_BUILD_INTEGRATION_TESTS=ON RUN_TESTS=OFF ./build.sh host
+    IPSEC_NATIVE_BUILD_INTEGRATION_TESTS=ON RUN_TESTS=OFF \
+        ./ipsec/cmake_build.sh host
 
 Required environment variables:
 

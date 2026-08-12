@@ -39,9 +39,9 @@ cd libipsec
 CMake is the primary build system. One script supports host and ZynqMP builds:
 
 ```sh
-./build.sh
-./build.sh zynqmp
-./build.sh clean
+./ipsec/cmake_build.sh
+./ipsec/cmake_build.sh zynqmp
+./ipsec/cmake_build.sh clean
 ```
 
 Host and ZynqMP outputs are isolated under `build/host` and `build/zynqmp`.
@@ -102,7 +102,8 @@ for target requirements and SDK sysroot builds.
 Live peer integration tests are opt-in:
 
 ```sh
-IPSEC_NATIVE_BUILD_INTEGRATION_TESTS=ON RUN_TESTS=OFF ./build.sh
+IPSEC_NATIVE_BUILD_INTEGRATION_TESTS=ON RUN_TESTS=OFF \
+    ./ipsec/cmake_build.sh
 ```
 
 Read the [integration test instructions](libipsec/tests/integration/README.md)
