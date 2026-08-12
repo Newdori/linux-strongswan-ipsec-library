@@ -62,11 +62,19 @@ lib/zynqmp/libipsec.a
 lib/zynqmp/libipsec.so
 ```
 
-The host application remains an explicit target:
+GNU Make library objects are generated under `libipsec_native/obj/x86_64` or
+`libipsec_native/obj/zynqmp`.
+
+The application has separate host and ZynqMP targets:
 
 ```sh
-make -f Makefile.host app
+make -C apps host
+make -C apps zynqmp
 ```
+
+Application objects are generated under `apps/obj/x86_64` or
+`apps/obj/zynqmp`. Executables are generated under the matching `apps/bin`
+directory.
 
 The default ZynqMP tool prefix is `aarch64-linux-gnu-`:
 

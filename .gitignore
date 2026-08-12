@@ -16,7 +16,10 @@ Thumbs.db
 /libipsec_native/build-*/
 /libipsec_native/.host-build/
 /libipsec_native/.zynqmp-build/
+/libipsec_native/obj/
 /libipsec_native/ipsec_native_app
+/libipsec_native/apps/obj/
+/libipsec_native/apps/bin/
 *.o
 *.d
 *.a

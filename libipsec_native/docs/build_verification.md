@@ -95,6 +95,11 @@ is `./lib/zynqmp/libipsec.a`.
 - The same Make dependency graph produced AArch64 ELF archives and shared
   objects with strict C11 warnings enabled.
 - The AArch64 ELF headers report `EM_AARCH64`.
+- The application Makefile produced x86_64 and AArch64 executables through
+  its `host` and `zynqmp` targets.
+- GNU Make object and dependency files are isolated under the target-specific
+  `obj/x86_64` and `obj/zynqmp` directories; application objects use the same
+  layout below `apps/obj`.
 - CMake found POSIX Threads through `Threads::Threads` and the complete
   static/shared/application/test build passed.
 - The Ubuntu, AArch64 Make and AArch64 CMake helper scripts pass Bash syntax

@@ -12,36 +12,57 @@ library.
 
 ## Build
 
-From the `libipsec_native` directory:
+From the `libipsec_native` directory, build the host application with:
 
 ```sh
-make -f Makefile.host clean all app
+make -C apps clean_host
+make -C apps host
 ```
 
-This creates the library under `lib` and the application in the project
-directory:
+Build the ZynqMP application with the default `aarch64-linux-gnu-` prefix:
+
+```sh
+make -C apps clean_zynqmp
+make -C apps zynqmp
+```
+
+The compiler prefix and PetaLinux sysroot can be overridden:
+
+```sh
+make -C apps zynqmp \
+    CROSS_COMPILE=aarch64-linux-gnu- \
+    SYSROOT=/path/to/petalinux/sysroot
+```
+
+Outputs are separated by architecture:
 
 ```text
 lib/x86_64/libipsec.a
-ipsec_native_app
+apps/obj/x86_64/*.o
+apps/bin/x86_64/ipsec_native_app
+
+lib/zynqmp/libipsec.a
+apps/obj/zynqmp/*.o
+apps/bin/zynqmp/ipsec_native_app
 ```
 
-Cross compilation follows the referenced `Makefile.host` convention:
+For compatibility, the parent host Makefile delegates its `app` target to the
+new application Makefile:
 
 ```sh
-make -f Makefile.host clean all app CROSS_COMPILE=aarch64-linux-gnu-
+make -f Makefile.host app
 ```
 
 ## Commands
 
 ```sh
-./ipsec_native_app --config /path/pc_a_initiator.conf check
-./ipsec_native_app --config /path/pc_a_initiator.conf load
-./ipsec_native_app --config /path/pc_a_initiator.conf up
-./ipsec_native_app --config /path/pc_a_initiator.conf status all
-./ipsec_native_app --config /path/pc_a_initiator.conf status child
-./ipsec_native_app --config /path/pc_a_initiator.conf rekey-child
-./ipsec_native_app --config /path/pc_a_initiator.conf down
+./apps/bin/x86_64/ipsec_native_app --config /path/pc_a_initiator.conf check
+./apps/bin/x86_64/ipsec_native_app --config /path/pc_a_initiator.conf load
+./apps/bin/x86_64/ipsec_native_app --config /path/pc_a_initiator.conf up
+./apps/bin/x86_64/ipsec_native_app --config /path/pc_a_initiator.conf status all
+./apps/bin/x86_64/ipsec_native_app --config /path/pc_a_initiator.conf status child
+./apps/bin/x86_64/ipsec_native_app --config /path/pc_a_initiator.conf rekey-child
+./apps/bin/x86_64/ipsec_native_app --config /path/pc_a_initiator.conf down
 ```
 
 `up` loads the connection and PSK, then initiates and waits for an installed
@@ -60,7 +81,7 @@ matching `reqid` in kernel XFRM state and policy, terminates the SA, waits until
 VICI and XFRM entries disappear, and unloads the connection.
 
 ```sh
-./ipsec_native_app --config /path/pc_a_initiator.conf loop \
+./apps/bin/x86_64/ipsec_native_app --config /path/pc_a_initiator.conf loop \
     --count 100 --delay-ms 500
 ```
 

@@ -10,7 +10,7 @@ fi
 pcConfig=$1
 uiCount=${2:-100}
 uiDelayMs=${3:-500}
-pcApplication=${IPSEC_NATIVE_APP:-./ipsec_native_app}
+pcApplication=${IPSEC_NATIVE_APP:-./apps/bin/x86_64/ipsec_native_app}
 
 exec "$pcApplication" --config "$pcConfig" loop \
     --count "$uiCount" --delay-ms "$uiDelayMs"

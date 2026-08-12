@@ -45,7 +45,7 @@ Build the application and use an initiator configuration with a live peer:
 
 The same operation can be invoked directly:
 
-    ./ipsec_native_app --config /path/to/pc_a_initiator.conf loop \
+    ./apps/bin/x86_64/ipsec_native_app --config /path/to/pc_a_initiator.conf loop \
       --count 100 --delay-ms 500
 
 Every iteration checks IKE and CHILD state through VICI, matches the CHILD

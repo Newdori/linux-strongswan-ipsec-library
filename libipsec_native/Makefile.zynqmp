@@ -12,7 +12,7 @@ RANLIB = $(CROSS_COMPILE)ranlib
 endif
 
 OUTPUT_DIR ?= lib/zynqmp
-BUILD_DIR ?= .zynqmp-build
+BUILD_DIR ?= obj/zynqmp
 MKDIR_P ?= mkdir -p
 RM_RF ?= rm -rf
 RM_F ?= rm -f
@@ -57,11 +57,15 @@ SRCIPSEC = \
 OBJECTS = $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCIPSEC))
 DEPFILES = $(OBJECTS:.o=.d)
 
-.PHONY: all libraries clean
+.PHONY: all libraries app clean
 
 all: libraries
 
 libraries: $(STATIC_LIBRARY) $(SHARED_LIBRARY)
+
+app:
+	$(MAKE) -C apps zynqmp CROSS_COMPILE="$(CROSS_COMPILE)" \
+		CC="$(CC)" SYSROOT="$(SYSROOT)"
 
 $(STATIC_LIBRARY): $(OBJECTS)
 	@$(MKDIR_P) $(dir $@)
@@ -82,3 +86,4 @@ $(BUILD_DIR)/%.o: %.c
 clean:
 	$(RM_RF) $(BUILD_DIR)
 	$(RM_F) $(STATIC_LIBRARY) $(SHARED_LIBRARY)
+	$(MAKE) -C apps clean_zynqmp
