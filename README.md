@@ -7,10 +7,10 @@ VICI and reads kernel status through NETLINK_XFRM, `/proc/net/xfrm_stat`, and
 NETLINK_ROUTE. It never launches `swanctl`, `ip`, `systemctl`, `tcpdump`,
 `iptables`, or another shell command.
 
-The product source is under `libipsec_native`. This repository is licensed
+The product source is under `libipsec`. This repository is licensed
 under the Apache License 2.0. See [LICENSE](LICENSE),
-[NOTICE](libipsec_native/NOTICE), and
-[THIRD_PARTY_NOTICES.md](libipsec_native/THIRD_PARTY_NOTICES.md).
+[NOTICE](libipsec/NOTICE), and
+[THIRD_PARTY_NOTICES.md](libipsec/THIRD_PARTY_NOTICES.md).
 
 ## Supported scope
 
@@ -33,13 +33,13 @@ daemon or firewall.
 Run build commands from the library directory:
 
 ```sh
-cd libipsec_native
+cd libipsec
 ```
 
 CMake is the primary build system:
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake -S ipsec -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
@@ -47,13 +47,14 @@ ctest --test-dir build --output-on-failure
 GNU Make follows separate host and ZynqMP targets:
 
 ```sh
-make host
-make zynqmp
-make
+make -C ipsec host
+make -C ipsec zynqmp
+make -C ipsec
 ```
 
-`make host` uses `Makefile.host`; `make zynqmp` uses `Makefile.zynqmp`; and a
-plain `make` builds both. Outputs are kept separate:
+`make -C ipsec host` uses `ipsec/Makefile.host`; `make -C ipsec zynqmp` uses
+`ipsec/Makefile.zynqmp`; and plain `make -C ipsec` builds both. Outputs are
+kept separate:
 
 ```text
 lib/x86_64/libipsec.a
@@ -62,8 +63,8 @@ lib/zynqmp/libipsec.a
 lib/zynqmp/libipsec.so
 ```
 
-GNU Make library objects are generated under `libipsec_native/obj/x86_64` or
-`libipsec_native/obj/zynqmp`.
+GNU Make library objects are generated under `libipsec/obj/x86_64` or
+`libipsec/obj/zynqmp`.
 
 The application has separate host and ZynqMP targets:
 
@@ -79,14 +80,14 @@ directory.
 The default ZynqMP tool prefix is `aarch64-linux-gnu-`:
 
 ```sh
-make zynqmp CROSS_COMPILE=aarch64-linux-gnu-
+make -C ipsec zynqmp CROSS_COMPILE=aarch64-linux-gnu-
 ```
 
 When using a PetaLinux SDK, source its environment first. If the compiler does
 not already carry its sysroot flags, pass the target sysroot explicitly:
 
 ```sh
-make zynqmp \
+make -C ipsec zynqmp \
   CC="$CC" AR="$AR" RANLIB="$RANLIB" \
   SYSROOT="$SDKTARGETSYSROOT"
 ```
@@ -107,25 +108,25 @@ Helper scripts are also provided:
 ./scripts/build_cmake_aarch64.sh
 ```
 
-See [PetaLinux compatibility](libipsec_native/docs/petalinux_compatibility.md)
+See [PetaLinux compatibility](libipsec/docs/petalinux_compatibility.md)
 for target requirements and SDK sysroot builds.
 
 Live peer integration tests are opt-in:
 
 ```sh
-cmake -S . -B build-live -DIPSEC_NATIVE_BUILD_INTEGRATION_TESTS=ON
+cmake -S ipsec -B build-live -DIPSEC_NATIVE_BUILD_INTEGRATION_TESTS=ON
 cmake --build build-live --target test_live_ipsec
 ```
 
-Read the [integration test instructions](libipsec_native/tests/integration/README.md)
+Read the [integration test instructions](libipsec/tests/integration/README.md)
 before running them on a dedicated daemon.
 
 ## Usage
 
 See:
 
-- [Native CLI application](libipsec_native/apps/README.md)
-- [Public API](libipsec_native/docs/public_api.md)
+- [Native CLI application](libipsec/apps/README.md)
+- [Public API](libipsec/docs/public_api.md)
 
 The `ipsec_native_app` target reuses product-relevant settings from v15
 endpoint configuration files and provides `load`, `up`, `down`, IKE/CHILD
@@ -151,7 +152,7 @@ PSK data is not retained in the context or written to logs.
 - The caller must ensure no API call is active while `DeinitializeIpsec()`
   runs.
 
-See [Native architecture](libipsec_native/docs/native_architecture.md) for
+See [Native architecture](libipsec/docs/native_architecture.md) for
 details.
 
 ## Runtime permissions
@@ -175,7 +176,7 @@ Expected dynamic dependencies are libc and pthread support as provided by the
 target toolchain. There must be no `libstrongswan`, `libcharon`, or `libvici`
 dependency.
 
-The shared object uses `src/libipsec_native.map` to export only the documented
+The shared object uses `ipsec/libipsec.map` to export only the documented
 public API. Internal VICI and Netlink parser symbols remain local.
 
 ## Validation status
@@ -190,6 +191,6 @@ and live integration-test binary compile with C11, `-Wall`, `-Wextra`,
 `-Wpedantic`, and `-Werror` for x86_64 and AArch64 Linux. A real `charon`, peer,
 and kernel XFRM runtime are still required for target-host qualification.
 
-See [v15 analysis](libipsec_native/docs/v15_analysis.md),
-[build verification](libipsec_native/docs/build_verification.md), and
-[phase status](libipsec_native/docs/phase_status.md) for the detailed records.
+See [v15 analysis](libipsec/docs/v15_analysis.md),
+[build verification](libipsec/docs/build_verification.md), and
+[phase status](libipsec/docs/phase_status.md) for the detailed records.

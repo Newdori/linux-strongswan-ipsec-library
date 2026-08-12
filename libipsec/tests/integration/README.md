@@ -8,7 +8,7 @@ do not use a production daemon.
 
 Configure and build:
 
-    cmake -S . -B build -DIPSEC_NATIVE_BUILD_INTEGRATION_TESTS=ON
+    cmake -S ipsec -B build -DIPSEC_NATIVE_BUILD_INTEGRATION_TESTS=ON
     cmake --build build --target test_live_ipsec
 
 Required environment variables:
@@ -39,7 +39,7 @@ use disposable test credentials on an isolated host.
 
 Build the application and use an initiator configuration with a live peer:
 
-    make -f Makefile.host clean all app
+    make -C ipsec -f Makefile.host clean all app
     ./tests/integration/run_loop_test.sh \
       /path/to/ipsec_app_project_v15/configs/pc_a_initiator.conf 100 500
 

@@ -196,7 +196,7 @@ static void LogNativeApp(
         pcLevel = "debug";
         break;
     }
-    (void)fprintf(stderr, "libipsec_native[%s]: %s\n", pcLevel, pcMessage);
+    (void)fprintf(stderr, "libipsec[%s]: %s\n", pcLevel, pcMessage);
 }
 
 static void HandleNativeAppSignal(int iSignal)

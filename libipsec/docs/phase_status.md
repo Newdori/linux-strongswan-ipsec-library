@@ -101,7 +101,7 @@ kernel XFRM이 없어 남은 target integration verification이다. 실행 절�
 
 ## 상용 배포 전 남은 조직 결정
 
-- 저작권자가 `libipsec_native`의 최종 proprietary 또는 open-source
+- 저작권자가 `libipsec`의 최종 proprietary 또는 open-source
   license text를 추가해야 한다.
 - 법무 검토에서 protocol interoperability, Linux UAPI header 사용,
   strongSwan 별도 프로세스 배포/고지 경계를 최종 확인해야 한다.

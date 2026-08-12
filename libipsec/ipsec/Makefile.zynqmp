@@ -1,4 +1,4 @@
-CROSS_COMPILE ?=
+CROSS_COMPILE ?= aarch64-linux-gnu-
 SYSROOT ?=
 
 ifneq ($(filter default undefined,$(origin CC)),)
@@ -11,14 +11,14 @@ ifneq ($(filter default undefined,$(origin RANLIB)),)
 RANLIB = $(CROSS_COMPILE)ranlib
 endif
 
-OUTPUT_DIR ?= lib/x86_64
-BUILD_DIR ?= obj/x86_64
+OUTPUT_DIR ?= ../lib/zynqmp
+BUILD_DIR ?= ../obj/zynqmp
 MKDIR_P ?= mkdir -p
 RM_RF ?= rm -rf
 RM_F ?= rm -f
 
-CPPFLAGS += -Iinclude
-CPPFLAGS += -Isrc/internal -Isrc/vici -Isrc/xfrm -Isrc/route
+CPPFLAGS += -I../include
+CPPFLAGS += -Iinternal -Ivici -Ixfrm -Iroute
 CFLAGS += -g -O2 -std=c11
 CFLAGS += -Wall -Wextra -Wpedantic -Werror
 CFLAGS += -fPIC -D_POSIX_C_SOURCE=200809L
@@ -33,29 +33,29 @@ STATIC_LIBRARY = $(OUTPUT_DIR)/libipsec.a
 SHARED_LIBRARY = $(OUTPUT_DIR)/libipsec.so
 
 SRCIPSEC = \
-	src/core/error.c \
-	src/core/ipsec.c \
-	src/core/log.c \
-	src/core/netlink.c \
-	src/core/util.c \
-	src/vici/vici_algorithm.c \
-	src/vici/vici_client.c \
-	src/vici/vici_connection.c \
-	src/vici/vici_credential.c \
-	src/vici/vici_packet.c \
-	src/vici/vici_parser.c \
-	src/vici/vici_sa.c \
-	src/vici/vici_stats.c \
-	src/vici/vici_transport.c \
-	src/xfrm/xfrm_policy.c \
-	src/xfrm/xfrm_state.c \
-	src/xfrm/xfrm_stats.c \
-	src/route/address.c \
-	src/route/interface.c \
-	src/route/route.c
+	core/error.c \
+	core/ipsec.c \
+	core/log.c \
+	core/netlink.c \
+	core/util.c \
+	vici/vici_algorithm.c \
+	vici/vici_client.c \
+	vici/vici_connection.c \
+	vici/vici_credential.c \
+	vici/vici_packet.c \
+	vici/vici_parser.c \
+	vici/vici_sa.c \
+	vici/vici_stats.c \
+	vici/vici_transport.c \
+	xfrm/xfrm_policy.c \
+	xfrm/xfrm_state.c \
+	xfrm/xfrm_stats.c \
+	route/address.c \
+	route/interface.c \
+	route/route.c
 
-OBJIPSEC = $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCIPSEC))
-DEPFILES = $(OBJIPSEC:.o=.d)
+OBJECTS = $(patsubst %.c,$(BUILD_DIR)/%.o,$(SRCIPSEC))
+DEPFILES = $(OBJECTS:.o=.d)
 
 .PHONY: all libraries app clean
 
@@ -64,18 +64,18 @@ all: libraries
 libraries: $(STATIC_LIBRARY) $(SHARED_LIBRARY)
 
 app:
-	$(MAKE) -C apps host CROSS_COMPILE="$(CROSS_COMPILE)" \
+	$(MAKE) -C ../apps zynqmp CROSS_COMPILE="$(CROSS_COMPILE)" \
 		CC="$(CC)" SYSROOT="$(SYSROOT)"
 
-$(STATIC_LIBRARY): $(OBJIPSEC)
+$(STATIC_LIBRARY): $(OBJECTS)
 	@$(MKDIR_P) $(dir $@)
 	$(AR) rcs $@ $^
 	$(RANLIB) $@
 
-$(SHARED_LIBRARY): $(OBJIPSEC)
+$(SHARED_LIBRARY): $(OBJECTS)
 	@$(MKDIR_P) $(dir $@)
 	$(CC) -shared $(LDFLAGS) -Wl,-soname,libipsec.so.0 \
-		-Wl,--version-script=src/libipsec_native.map -o $@ $^ $(LDLIBS)
+		-Wl,--version-script=libipsec.map -o $@ $^ $(LDLIBS)
 
 $(BUILD_DIR)/%.o: %.c
 	@$(MKDIR_P) $(dir $@)
@@ -86,4 +86,4 @@ $(BUILD_DIR)/%.o: %.c
 clean:
 	$(RM_RF) $(BUILD_DIR)
 	$(RM_F) $(STATIC_LIBRARY) $(SHARED_LIBRARY)
-	$(MAKE) -C apps clean_host
+	$(MAKE) -C ../apps clean_zynqmp

@@ -2,13 +2,13 @@
 
 ## 1. 설계 목표
 
-`libipsec_native`는 IKEv2/IPsec 엔진을 구현하지 않는다. 독립 프로세스로 실행 중인 strongSwan `charon`을 VICI IPC로 제어하고, Linux kernel의 XFRM/network 상태를 Netlink와 `/proc`로 조회하는 C11 라이브러리다.
+`libipsec`는 IKEv2/IPsec 엔진을 구현하지 않는다. 독립 프로세스로 실행 중인 strongSwan `charon`을 VICI IPC로 제어하고, Linux kernel의 XFRM/network 상태를 Netlink와 `/proc`로 조회하는 C11 라이브러리다.
 
 ```text
 Application
     |
     v
-libipsec_native
+libipsec
     |
     +-- VICI ---------- charon
     |
@@ -48,15 +48,19 @@ strongSwan GPL library에는 링크하지 않는다. VICI wire protocol을 독�
 ## 3. 디렉터리
 
 ```text
-libipsec_native/
-|-- CMakeLists.txt
-|-- Makefile
+libipsec/
 |-- LICENSES.md
 |-- include/
 |   |-- ipsec.h
 |   |-- ipsec_types.h
 |   `-- ipsec_error.h
-|-- src/
+|-- ipsec/
+|   |-- CMakeLists.txt
+|   |-- Makefile
+|   |-- Makefile.host
+|   |-- Makefile.zynqmp
+|   |-- cmake/
+|   |   `-- toolchains/
 |   |-- internal/
 |   |   `-- ipsec_internal.h
 |   |-- core/
@@ -86,6 +90,7 @@ libipsec_native/
 |       |-- address.c
 |       `-- route.c
 |-- apps/
+|   |-- Makefile
 |   |-- app_internal.h
 |   |-- config.c
 |   |-- lifecycle.c

@@ -73,7 +73,7 @@ symbols are local.
 
 ## Prohibited behavior scans
 
-Source-only scans of `src/` and `include/` report:
+Source-only scans of `ipsec/` and `include/` report:
 
 | Check | Matches |
 |---|---:|
@@ -90,6 +90,13 @@ is `./lib/zynqmp/libipsec.a`.
 
 ## Public repository and PetaLinux build update
 
+- The product directory was renamed to `libipsec`; library implementation and
+  build entry points now reside under `libipsec/ipsec`.
+- GNU Make host and ZynqMP library builds, both application builds, and the
+  complete CMake target graph compile successfully from the relocated paths.
+- CMake registers all six unit tests. The Windows verification host cannot
+  execute the generated Linux ELF test binaries; execution remains covered by
+  the Ubuntu CI job and target-host validation.
 - GNU Make produced both `lib/x86_64/libipsec.a` and
   `lib/x86_64/libipsec.so` for x86_64 Linux.
 - The same Make dependency graph produced AArch64 ELF archives and shared

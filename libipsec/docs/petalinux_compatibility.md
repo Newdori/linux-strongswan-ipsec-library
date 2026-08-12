@@ -50,15 +50,15 @@ Only GNU Make and the normal C build tools are required:
 
 ```sh
 sudo apt-get install build-essential
-make clean
-make -j"$(nproc)"
+make -C ipsec clean_host
+make -C ipsec host -j"$(nproc)"
 ```
 
 Outputs:
 
 ```text
-lib/zynqmp/libipsec.a
-lib/zynqmp/libipsec.so
+lib/x86_64/libipsec.a
+lib/x86_64/libipsec.so
 ```
 
 The equivalent helper is:
@@ -71,8 +71,9 @@ The equivalent helper is:
 
 ```sh
 sudo apt-get install gcc-aarch64-linux-gnu
-make clean
-make -j"$(nproc)" CROSS_COMPILE=aarch64-linux-gnu-
+make -C ipsec clean_zynqmp
+make -C ipsec zynqmp -j"$(nproc)" \
+    CROSS_COMPILE=aarch64-linux-gnu-
 ```
 
 or:
@@ -89,8 +90,8 @@ for deployment:
 
 ```sh
 export SYSROOT=/opt/petalinux-sdk/sysroots/aarch64-xilinx-linux
-make clean
-make -j"$(nproc)" \
+make -C ipsec clean_zynqmp
+make -C ipsec zynqmp -j"$(nproc)" \
     CROSS_COMPILE=aarch64-linux-gnu- \
     SYSROOT="${SYSROOT}"
 ```

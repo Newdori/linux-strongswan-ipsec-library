@@ -7,7 +7,7 @@ pcProjectDirectory=$(CDPATH= cd -- "${pcScriptDirectory}/.." && pwd)
 pcCrossCompile=${CROSS_COMPILE:-aarch64-linux-gnu-}
 uiJobCount=${BUILD_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf '1')}
 acMakeArguments=(
-    -C "${pcProjectDirectory}"
+    -C "${pcProjectDirectory}/ipsec"
     -j"${uiJobCount}"
     zynqmp
     "CROSS_COMPILE=${pcCrossCompile}"
@@ -28,7 +28,7 @@ else
     :
 fi
 
-make -C "${pcProjectDirectory}" clean_zynqmp
+make -C "${pcProjectDirectory}/ipsec" clean_zynqmp
 make "${acMakeArguments[@]}"
 
 "${pcCrossCompile}readelf" -h \

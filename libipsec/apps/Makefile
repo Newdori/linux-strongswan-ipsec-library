@@ -60,7 +60,7 @@ zynqmp:
 build: $(APPLICATION)
 
 library:
-	$(MAKE) -C .. $(LIBRARY_TARGET) CROSS_COMPILE="$(CROSS_COMPILE)" \
+	$(MAKE) -C ../ipsec $(LIBRARY_TARGET) CROSS_COMPILE="$(CROSS_COMPILE)" \
 		CC="$(CC)" SYSROOT="$(SYSROOT)"
 
 $(APPLICATION): library $(OBJECTS)

@@ -12,7 +12,7 @@ library.
 
 ## Build
 
-From the `libipsec_native` directory, build the host application with:
+From the `libipsec` directory, build the host application with:
 
 ```sh
 make -C apps clean_host
@@ -50,7 +50,7 @@ For compatibility, the parent host Makefile delegates its `app` target to the
 new application Makefile:
 
 ```sh
-make -f Makefile.host app
+make -C ipsec -f Makefile.host app
 ```
 
 ## Commands

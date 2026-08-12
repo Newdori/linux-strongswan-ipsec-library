@@ -12,14 +12,14 @@ Thumbs.db
 /.reference/
 
 # Build output
-/libipsec_native/build/
-/libipsec_native/build-*/
-/libipsec_native/.host-build/
-/libipsec_native/.zynqmp-build/
-/libipsec_native/obj/
-/libipsec_native/ipsec_native_app
-/libipsec_native/apps/obj/
-/libipsec_native/apps/bin/
+/libipsec/build/
+/libipsec/build-*/
+/libipsec/.host-build/
+/libipsec/.zynqmp-build/
+/libipsec/obj/
+/libipsec/ipsec_native_app
+/libipsec/apps/obj/
+/libipsec/apps/bin/
 *.o
 *.d
 *.a
@@ -27,13 +27,13 @@ Thumbs.db
 *.so.*
 
 # CMake in-source artifacts
-/libipsec_native/CMakeCache.txt
-/libipsec_native/CMakeFiles/
-/libipsec_native/CTestTestfile.cmake
-/libipsec_native/Testing/
-/libipsec_native/cmake_install.cmake
-/libipsec_native/compile_commands.json
-/libipsec_native/install_manifest.txt
+/libipsec/CMakeCache.txt
+/libipsec/CMakeFiles/
+/libipsec/CTestTestfile.cmake
+/libipsec/Testing/
+/libipsec/cmake_install.cmake
+/libipsec/compile_commands.json
+/libipsec/install_manifest.txt
 
 # Secrets and local configuration
 .env
@@ -45,12 +45,12 @@ Thumbs.db
 *.pk8
 *.p12
 *.pfx
-/libipsec_native/secrets/
-/libipsec_native/private/
-/libipsec_native/credentials/
+/libipsec/secrets/
+/libipsec/private/
+/libipsec/credentials/
 
 # Runtime output
-/libipsec_native/results/
+/libipsec/results/
 *.log
 *.pcap
 *.pcapng
