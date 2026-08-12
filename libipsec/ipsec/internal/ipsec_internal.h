@@ -54,6 +54,11 @@ IpsecError_t ParseIpsecUint64(
     uint64_t *pullValue,
     uint32_t uiBase);
 
+IpsecError_t ParseIpsecDurationSeconds(
+    const uint8_t *pucValue,
+    size_t zValueLength,
+    uint64_t *pullSeconds);
+
 IpsecError_t AppendIpsecText(
     char *pcDestination,
     size_t zDestinationLength,

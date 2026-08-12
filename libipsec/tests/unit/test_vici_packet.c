@@ -194,6 +194,39 @@ static int32_t TestPacketBoundary(void)
     }
 }
 
+static int32_t TestHumanReadableUptime(void)
+{
+    static const uint8_t aucMinutes[] = "18 minutes";
+    static const uint8_t aucComposite[] = "1 hour, 2 minutes";
+    static const uint8_t aucSubsecond[] = "less than a second";
+    static const uint8_t aucUnknown[] = "18 fortnights";
+    uint64_t ullSeconds = 99U;
+
+    if ((IPSEC_OK != ParseIpsecDurationSeconds(
+             aucMinutes, sizeof(aucMinutes) - 1U, &ullSeconds)) ||
+        (1080U != ullSeconds)) {
+        return ReportFailure("VICI uptime minutes");
+    }
+    else if ((IPSEC_OK != ParseIpsecDurationSeconds(
+                  aucComposite, sizeof(aucComposite) - 1U, &ullSeconds)) ||
+             (3720U != ullSeconds)) {
+        return ReportFailure("VICI composite uptime");
+    }
+    else if ((IPSEC_OK != ParseIpsecDurationSeconds(
+                  aucSubsecond, sizeof(aucSubsecond) - 1U, &ullSeconds)) ||
+             (0U != ullSeconds)) {
+        return ReportFailure("VICI subsecond uptime");
+    }
+    else if ((IPSEC_ERR_VICI_PROTOCOL != ParseIpsecDurationSeconds(
+                  aucUnknown, sizeof(aucUnknown) - 1U, &ullSeconds)) ||
+             (0U != ullSeconds)) {
+        return ReportFailure("unknown VICI uptime unit");
+    }
+    else {
+        return 0;
+    }
+}
+
 int main(void)
 {
     int32_t iResult;
@@ -207,6 +240,12 @@ int main(void)
     }
     if (0 == iResult) {
         iResult = TestPacketBoundary();
+    }
+    else {
+        /* Preserve first failure. */
+    }
+    if (0 == iResult) {
+        iResult = TestHumanReadableUptime();
     }
     else {
         /* Preserve first failure. */

@@ -1,5 +1,6 @@
 #include "../internal/ipsec_internal.h"
 
+#include <ctype.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -140,6 +141,138 @@ IpsecError_t ParseIpsecUint64(
     uint32_t uiBase)
 {
     return ParseIpsecUnsigned(pucValue, zValueLength, pullValue, uiBase);
+}
+
+static bool GetIpsecDurationMultiplier(
+    const char *pcUnit,
+    size_t zUnitLength,
+    uint64_t *pullMultiplier)
+{
+    bool bKnown = true;
+
+    if ((1U < zUnitLength) && ('s' == pcUnit[zUnitLength - 1U])) {
+        zUnitLength--;
+    }
+    else {
+        /* The unit is already singular. */
+    }
+    if ((6U == zUnitLength) &&
+        (0 == memcmp("second", pcUnit, zUnitLength))) {
+        *pullMultiplier = 1U;
+    }
+    else if ((6U == zUnitLength) &&
+             (0 == memcmp("minute", pcUnit, zUnitLength))) {
+        *pullMultiplier = 60U;
+    }
+    else if ((4U == zUnitLength) &&
+             (0 == memcmp("hour", pcUnit, zUnitLength))) {
+        *pullMultiplier = 60U * 60U;
+    }
+    else if ((3U == zUnitLength) &&
+             (0 == memcmp("day", pcUnit, zUnitLength))) {
+        *pullMultiplier = 24U * 60U * 60U;
+    }
+    else if ((4U == zUnitLength) &&
+             (0 == memcmp("week", pcUnit, zUnitLength))) {
+        *pullMultiplier = 7U * 24U * 60U * 60U;
+    }
+    else {
+        bKnown = false;
+    }
+    return bKnown;
+}
+
+IpsecError_t ParseIpsecDurationSeconds(
+    const uint8_t *pucValue,
+    size_t zValueLength,
+    uint64_t *pullSeconds)
+{
+    char acText[128];
+    char *pcCursor;
+    uint64_t ullTotal = 0U;
+    IpsecError_t eError = IPSEC_OK;
+
+    if ((NULL == pucValue) || (0U == zValueLength) ||
+        (zValueLength >= sizeof(acText)) || (NULL == pullSeconds)) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    else {
+        memcpy(acText, pucValue, zValueLength);
+        acText[zValueLength] = '\0';
+        pcCursor = acText;
+    }
+    if (0 == strcmp("less than a second", acText)) {
+        *pullSeconds = 0U;
+        SecureZeroIpsec(acText, sizeof(acText));
+        return IPSEC_OK;
+    }
+    else {
+        /* Parse one or more number/unit pairs below. */
+    }
+
+    while (('\0' != *pcCursor) && (IPSEC_OK == eError)) {
+        const char *pcUnit;
+        char *pcEnd = NULL;
+        uint64_t ullValue;
+        uint64_t ullMultiplier = 0U;
+        size_t zUnitLength;
+
+        while ((' ' == *pcCursor) || (',' == *pcCursor)) {
+            pcCursor++;
+        }
+        if ('\0' == *pcCursor) {
+            break;
+        }
+        else {
+            errno = 0;
+            ullValue = (uint64_t)strtoull(pcCursor, &pcEnd, 10);
+        }
+        if ((0 != errno) || (pcEnd == pcCursor)) {
+            eError = IPSEC_ERR_VICI_PROTOCOL;
+            continue;
+        }
+        else {
+            pcCursor = pcEnd;
+        }
+        while (' ' == *pcCursor) {
+            pcCursor++;
+        }
+        pcUnit = pcCursor;
+        while (0 != isalpha((unsigned char)*pcCursor)) {
+            pcCursor++;
+        }
+        zUnitLength = (size_t)(pcCursor - pcUnit);
+        if ((0U == zUnitLength) ||
+            !GetIpsecDurationMultiplier(pcUnit, zUnitLength,
+                                        &ullMultiplier) ||
+            ((0U != ullValue) &&
+             ((UINT64_MAX / ullValue) < ullMultiplier))) {
+            eError = IPSEC_ERR_VICI_PROTOCOL;
+        }
+        else if ((UINT64_MAX - ullTotal) < (ullValue * ullMultiplier)) {
+            eError = IPSEC_ERR_VICI_PROTOCOL;
+        }
+        else {
+            ullTotal += ullValue * ullMultiplier;
+        }
+        while (' ' == *pcCursor) {
+            pcCursor++;
+        }
+        if (('\0' != *pcCursor) && (',' != *pcCursor)) {
+            eError = IPSEC_ERR_VICI_PROTOCOL;
+        }
+        else {
+            /* The next loop consumes a comma or finishes the text. */
+        }
+    }
+    if (IPSEC_OK == eError) {
+        *pullSeconds = ullTotal;
+    }
+    else {
+        /* Do not modify the output when the optional text is unknown. */
+    }
+    SecureZeroIpsec(acText, sizeof(acText));
+    return eError;
 }
 
 IpsecError_t AppendIpsecText(

@@ -77,9 +77,16 @@ static IpsecError_t CollectStatusNestedValue(
     if ((0 == strcmp(pcSection, "uptime")) &&
         MatchStatusText(pElement->pucName, pElement->ucNameLength,
                         "running")) {
-        eError = ParseIpsecUint64(pElement->pucValue,
-                                  pElement->usValueLength,
-                                  &pStatus->ullUptimeSeconds, 10U);
+        IpsecError_t eDurationError = ParseIpsecDurationSeconds(
+            pElement->pucValue, pElement->usValueLength,
+            &pStatus->ullUptimeSeconds);
+
+        if (IPSEC_OK != eDurationError) {
+            pStatus->ullUptimeSeconds = 0U;
+        }
+        else {
+            /* The human-readable uptime was converted to seconds. */
+        }
     }
     else if ((0 == strcmp(pcSection, "workers")) &&
         MatchStatusText(pElement->pucName, pElement->ucNameLength, "total")) {
