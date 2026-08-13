@@ -98,7 +98,6 @@ static bool IsNativeAppIgnoredV15Key(const char *pcKey)
 {
     static const char *pacKeys[] = {
         "local_cidr", "interface", "interface_name", "service_name",
-        "output_root",
         "initiator_udp_bind_ip", "responder_udp_bind_ip", "udp_port",
         "matrix_control_port", "packet_count", "payload_size", "udp_size",
         "udp_interval_ms", "udp_start_delay_sec", "test_timeout_sec",
@@ -163,6 +162,11 @@ IpsecError_t SetNativeAppConfigSetting(
     else if (0 == strcmp("psk_file", pcKey)) {
         bAccepted = CopyNativeAppText(pConfig->acPskFile,
                                      sizeof(pConfig->acPskFile), pcValue);
+    }
+    else if (0 == strcmp("output_root", pcKey)) {
+        bAccepted = ('\0' != pcValue[0]) &&
+            CopyNativeAppText(pConfig->acOutputRoot,
+                              sizeof(pConfig->acOutputRoot), pcValue);
     }
     else if (0 == strcmp("vici_uri", pcKey)) {
         const char *pcPath = pcValue;
@@ -309,6 +313,8 @@ void InitializeNativeAppConfig(NativeAppConfig_t *pConfig)
         pConfig->eRole = NATIVE_APP_ROLE_INITIATOR;
         pConfig->eMode = IPSEC_MODE_TUNNEL;
         pConfig->uiTimeoutMs = 30000U;
+        (void)CopyNativeAppText(pConfig->acOutputRoot,
+                               sizeof(pConfig->acOutputRoot), "./results");
         (void)CopyNativeAppText(pConfig->acViciSocket,
                                sizeof(pConfig->acViciSocket),
                                "/run/charon.vici");

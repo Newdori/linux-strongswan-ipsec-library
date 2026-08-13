@@ -50,6 +50,7 @@ int main(int iArgumentCount, char **ppcArguments)
                  ((NATIVE_APP_ROLE_INITIATOR != Config.eRole) ||
                   (IPSEC_MODE_TRANSPORT != Config.eMode) ||
                   (60000U != Config.uiTimeoutMs) ||
+                  (0 != strcmp("./results", Config.acOutputRoot)) ||
                   (0 != strcmp("/run/charon.vici", Config.acViciSocket)) ||
                   (0 != strcmp("192.0.2.10/32",
                                Runtime.acLocalTrafficSelector)) ||

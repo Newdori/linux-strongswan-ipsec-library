@@ -4,11 +4,14 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <netinet/in.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -122,6 +125,191 @@ static IpsecError_t CopyNativeAppAlgorithmValue(
     else {
         return IPSEC_OK;
     }
+}
+
+static void ReportNativeAppAlgorithm(
+    FILE *pLog,
+    FILE *pStream,
+    const char *pcLevel,
+    const char *pcFormat,
+    ...)
+{
+    char acTimestamp[32] = {0};
+    struct tm TimeValue;
+    time_t TimeNow = time(NULL);
+    va_list Arguments;
+    va_list LogArguments;
+
+    va_start(Arguments, pcFormat);
+    va_copy(LogArguments, Arguments);
+    (void)vfprintf(pStream, pcFormat, Arguments);
+    (void)fputc('\n', pStream);
+    (void)fflush(pStream);
+    va_end(Arguments);
+
+    if ((NULL != pLog) &&
+        (NULL != localtime_r(&TimeNow, &TimeValue)) &&
+        (0U < strftime(acTimestamp, sizeof(acTimestamp),
+                       "%Y-%m-%d %H:%M:%S", &TimeValue))) {
+        (void)fprintf(pLog, "[%s] [%s] ", acTimestamp, pcLevel);
+        (void)vfprintf(pLog, pcFormat, LogArguments);
+        (void)fputc('\n', pLog);
+        (void)fflush(pLog);
+    }
+    else {
+        /* Console reporting remains available when no result log is open. */
+    }
+    va_end(LogArguments);
+}
+
+static IpsecError_t CreateNativeAppAlgorithmDirectory(const char *pcPath)
+{
+    char acPath[NATIVE_APP_PATH_LENGTH];
+    char *pcCursor;
+    IpsecError_t eError;
+
+    eError = CopyNativeAppAlgorithmValue(acPath, sizeof(acPath), pcPath);
+    if (IPSEC_OK != eError) {
+        return eError;
+    }
+    for (pcCursor = acPath + 1; '\0' != *pcCursor; pcCursor++) {
+        if ('/' == *pcCursor) {
+            *pcCursor = '\0';
+            if ((0 != mkdir(acPath, 0750)) && (EEXIST != errno)) {
+                return IPSEC_ERR_FILE_OPEN;
+            }
+            else {
+                *pcCursor = '/';
+            }
+        }
+        else {
+            /* Continue through the current path component. */
+        }
+    }
+    if ((0 != mkdir(acPath, 0750)) && (EEXIST != errno)) {
+        eError = IPSEC_ERR_FILE_OPEN;
+    }
+    else {
+        struct stat Status;
+
+        eError = ((0 == stat(acPath, &Status)) && S_ISDIR(Status.st_mode)) ?
+            IPSEC_OK : IPSEC_ERR_FILE_OPEN;
+    }
+    return eError;
+}
+
+static IpsecError_t JoinNativeAppAlgorithmPath(
+    char *pcPath,
+    size_t zPathLength,
+    const char *pcDirectory,
+    const char *pcName)
+{
+    int32_t iLength;
+    size_t zDirectoryLength;
+
+    if ((NULL == pcPath) || (0U == zPathLength) ||
+        (NULL == pcDirectory) || (NULL == pcName)) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    zDirectoryLength = strlen(pcDirectory);
+    iLength = snprintf(pcPath, zPathLength, "%s%s%s", pcDirectory,
+                       ((0U < zDirectoryLength) &&
+                        ('/' == pcDirectory[zDirectoryLength - 1U])) ?
+                       "" : "/", pcName);
+    return ((0 <= iLength) && ((size_t)iLength < zPathLength)) ?
+        IPSEC_OK : IPSEC_ERR_BUFFER_TOO_SMALL;
+}
+
+static IpsecError_t CreateNativeAppAlgorithmRunId(
+    NativeAppAlgorithmMode_t eMode,
+    char *pcRunId,
+    size_t zRunIdLength)
+{
+    char acTimestamp[32];
+    struct tm TimeValue;
+    time_t TimeNow = time(NULL);
+    int32_t iLength;
+
+    if ((NULL == pcRunId) || (0U == zRunIdLength) ||
+        (NULL == localtime_r(&TimeNow, &TimeValue)) ||
+        (0U == strftime(acTimestamp, sizeof(acTimestamp),
+                        "%Y%m%d_%H%M%S", &TimeValue))) {
+        return IPSEC_ERR_INTERNAL;
+    }
+    iLength = snprintf(pcRunId, zRunIdLength, "%s_%s_%ld",
+                       GetNativeAppAlgorithmModeName(eMode), acTimestamp,
+                       (long)getpid());
+    return ((0 <= iLength) && ((size_t)iLength < zRunIdLength)) ?
+        IPSEC_OK : IPSEC_ERR_BUFFER_TOO_SMALL;
+}
+
+static bool IsNativeAppAlgorithmRunIdValid(const char *pcRunId)
+{
+    const unsigned char *pucCursor = (const unsigned char *)pcRunId;
+    size_t zLength;
+
+    if (NULL == pcRunId) {
+        return false;
+    }
+    zLength = strnlen(pcRunId, NATIVE_APP_ALGORITHM_RUN_ID_LENGTH);
+    if ((0U == zLength) ||
+        (NATIVE_APP_ALGORITHM_RUN_ID_LENGTH <= zLength)) {
+        return false;
+    }
+    while ('\0' != *pucCursor) {
+        if (((*pucCursor >= (unsigned char)'a') &&
+             (*pucCursor <= (unsigned char)'z')) ||
+            ((*pucCursor >= (unsigned char)'A') &&
+             (*pucCursor <= (unsigned char)'Z')) ||
+            ((*pucCursor >= (unsigned char)'0') &&
+             (*pucCursor <= (unsigned char)'9')) ||
+            ((unsigned char)'_' == *pucCursor) ||
+            ((unsigned char)'-' == *pucCursor)) {
+            pucCursor++;
+        }
+        else {
+            return false;
+        }
+    }
+    return true;
+}
+
+static IpsecError_t OpenNativeAppAlgorithmRunLog(
+    const NativeAppConfig_t *pConfig,
+    const char *pcRunId,
+    const char *pcRole,
+    char *pcResultDirectory,
+    size_t zResultDirectoryLength,
+    FILE **ppLog)
+{
+    char acDirectoryName[NATIVE_APP_PATH_LENGTH];
+    char acLogPath[NATIVE_APP_PATH_LENGTH];
+    int32_t iLength;
+    IpsecError_t eError;
+
+    iLength = snprintf(acDirectoryName, sizeof(acDirectoryName), "%s_%s",
+                       pcRunId, pcRole);
+    if ((0 > iLength) || ((size_t)iLength >= sizeof(acDirectoryName))) {
+        return IPSEC_ERR_BUFFER_TOO_SMALL;
+    }
+    eError = JoinNativeAppAlgorithmPath(
+        pcResultDirectory, zResultDirectoryLength, pConfig->acOutputRoot,
+        acDirectoryName);
+    if (IPSEC_OK == eError) {
+        eError = CreateNativeAppAlgorithmDirectory(pcResultDirectory);
+    }
+    if (IPSEC_OK == eError) {
+        eError = JoinNativeAppAlgorithmPath(
+            acLogPath, sizeof(acLogPath), pcResultDirectory,
+            "application.log");
+    }
+    if (IPSEC_OK == eError) {
+        *ppLog = fopen(acLogPath, "w");
+        if (NULL == *ppLog) {
+            eError = IPSEC_ERR_FILE_OPEN;
+        }
+    }
+    return eError;
 }
 
 static IpsecError_t BuildNativeAppAlgorithmConfig(
@@ -502,6 +690,53 @@ static IpsecError_t QueryNativeAppAlgorithmState(
     return eError;
 }
 
+static void ReportNativeAppAlgorithmFinalState(
+    IpsecContext_t *pContext,
+    FILE *pLog)
+{
+    IpsecConnectionList_t ConnectionList = {0};
+    IpsecIkeSaList_t IkeList = {0};
+    IpsecChildSaList_t ChildList = {0};
+    IpsecXfrmStateList_t StateList = {0};
+    IpsecXfrmPolicyList_t PolicyList = {0};
+    IpsecError_t eConnection;
+    IpsecError_t eIke;
+    IpsecError_t eChild;
+    IpsecError_t eState;
+    IpsecError_t ePolicy;
+
+    eConnection = GetIpsecConnections(pContext, &ConnectionList);
+    eIke = GetIpsecIkeSas(pContext, &IkeList);
+    eChild = GetIpsecChildSas(pContext, &ChildList);
+    eState = GetIpsecXfrmStates(pContext, &StateList);
+    ePolicy = GetIpsecXfrmPolicies(pContext, &PolicyList);
+    if ((IPSEC_OK == eConnection) && (IPSEC_OK == eIke) &&
+        (IPSEC_OK == eChild) && (IPSEC_OK == eState) &&
+        (IPSEC_OK == ePolicy)) {
+        ReportNativeAppAlgorithm(
+            pLog, stdout, "INFO",
+            "final state: connections=%" PRIu32 " ike=%" PRIu32
+            " child=%" PRIu32 " xfrm_states=%" PRIu32
+            " xfrm_policies=%" PRIu32,
+            ConnectionList.uiCount, IkeList.uiCount, ChildList.uiCount,
+            StateList.uiCount, PolicyList.uiCount);
+    }
+    else {
+        ReportNativeAppAlgorithm(
+            pLog, stderr, "WARN",
+            "final state query: connections=%s ike=%s child=%s"
+            " xfrm_states=%s xfrm_policies=%s",
+            GetIpsecErrorString(eConnection), GetIpsecErrorString(eIke),
+            GetIpsecErrorString(eChild), GetIpsecErrorString(eState),
+            GetIpsecErrorString(ePolicy));
+    }
+    FreeIpsecXfrmPolicyList(&PolicyList);
+    FreeIpsecXfrmStateList(&StateList);
+    FreeIpsecChildSaList(&ChildList);
+    FreeIpsecIkeSaList(&IkeList);
+    FreeIpsecConnectionList(&ConnectionList);
+}
+
 static IpsecError_t CleanupNativeAppAlgorithmCase(
     IpsecContext_t *pContext,
     const NativeAppConfig_t *pConfig,
@@ -571,6 +806,7 @@ static void WriteNativeAppJsonString(FILE *pFile, const char *pcText)
 
 static IpsecError_t OpenNativeAppAlgorithmJson(
     const NativeAppAlgorithmOptions_t *pOptions,
+    const char *pcRunId,
     uint32_t uiRequested,
     NativeAppAlgorithmJsonWriter_t *pWriter)
 {
@@ -582,8 +818,10 @@ static IpsecError_t OpenNativeAppAlgorithmJson(
     if (NULL == pWriter->pFile) {
         return IPSEC_ERR_FILE_OPEN;
     }
-    (void)fputs("{\n  \"schema_version\": 1,\n  \"mode\": ",
+    (void)fputs("{\n  \"schema_version\": 1,\n  \"run_id\": ",
                 pWriter->pFile);
+    WriteNativeAppJsonString(pWriter->pFile, pcRunId);
+    (void)fputs(",\n  \"mode\": ", pWriter->pFile);
     WriteNativeAppJsonString(pWriter->pFile,
                              GetNativeAppAlgorithmModeName(pOptions->eMode));
     (void)fprintf(pWriter->pFile,
@@ -725,15 +963,26 @@ static IpsecError_t PrepareNativeAppAlgorithmPeer(
     int32_t iSocket,
     const NativeAppAlgorithmEndpoint_t *pRemote,
     const NativeAppAlgorithmCase_t *pCase,
+    const char *pcRunId,
     uint32_t uiTimeoutMs)
 {
     char acMessage[NATIVE_APP_ALGORITHM_MESSAGE_LENGTH];
     uint64_t ullElapsedMs = 0U;
+    int32_t iLength;
     IpsecError_t eError;
 
-    eError = FormatNativeAppAlgorithmMessage(
-        acMessage, sizeof(acMessage), "PREPARE", pCase,
-        pCase->acIkeProposal, pCase->acEspProposal);
+    if ((NULL == pcRunId) || (NULL != strpbrk(pcRunId, "|\r\n"))) {
+        eError = IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    else {
+        iLength = snprintf(
+            acMessage, sizeof(acMessage), "%s|PREPARE|%s|%s|%s|%s",
+            NATIVE_APP_ALGORITHM_PROTOCOL, pCase->acId,
+            pCase->acIkeProposal, pCase->acEspProposal, pcRunId);
+        eError = ((0 <= iLength) &&
+                  ((size_t)iLength < sizeof(acMessage))) ?
+            IPSEC_OK : IPSEC_ERR_BUFFER_TOO_SMALL;
+    }
     while ((IPSEC_OK == eError) &&
            (ullElapsedMs <= (uint64_t)uiTimeoutMs) &&
            !IsNativeAppStopRequested()) {
@@ -802,11 +1051,38 @@ static IpsecError_t FinishNativeAppAlgorithmPeer(
     return eError;
 }
 
+static IpsecError_t FinishNativeAppAlgorithmRun(
+    int32_t iSocket,
+    const NativeAppAlgorithmEndpoint_t *pRemote,
+    const char *pcRunId,
+    uint32_t uiTimeoutMs)
+{
+    NativeAppAlgorithmCase_t Case = {0};
+    char acMessage[NATIVE_APP_ALGORITHM_MESSAGE_LENGTH];
+    IpsecError_t eError;
+
+    eError = CopyNativeAppAlgorithmValue(Case.acId, sizeof(Case.acId),
+                                         pcRunId);
+    if (IPSEC_OK == eError) {
+        eError = FormatNativeAppAlgorithmMessage(
+            acMessage, sizeof(acMessage), "FINISH", &Case, "DONE", "0");
+    }
+    if (IPSEC_OK == eError) {
+        eError = SendNativeAppAlgorithmMessage(iSocket, pRemote, acMessage);
+    }
+    if (IPSEC_OK == eError) {
+        eError = WaitNativeAppAlgorithmResponse(
+            iSocket, pRemote, "FINISHED", Case.acId, uiTimeoutMs, NULL, 0U);
+    }
+    return eError;
+}
+
 static IpsecError_t RunNativeAppAlgorithmCaseClient(
     IpsecContext_t *pContext,
     int32_t iSocket,
     const NativeAppAlgorithmEndpoint_t *pRemote,
     const NativeAppConfig_t *pBaseConfig,
+    const char *pcRunId,
     const NativeAppAlgorithmCase_t *pCase,
     NativeAppAlgorithmCaseResult_t *pResult)
 {
@@ -819,7 +1095,7 @@ static IpsecError_t RunNativeAppAlgorithmCaseClient(
 
     pResult->Case = *pCase;
     pResult->eResult = NATIVE_APP_ALGORITHM_RESULT_FAIL_CONFIG;
-    eError = PrepareNativeAppAlgorithmPeer(iSocket, pRemote, pCase,
+    eError = PrepareNativeAppAlgorithmPeer(iSocket, pRemote, pCase, pcRunId,
                                            pBaseConfig->uiTimeoutMs);
     if (IPSEC_OK != eError) {
         pResult->eResult = NATIVE_APP_ALGORITHM_RESULT_FAIL_SYNC;
@@ -892,6 +1168,12 @@ IpsecError_t RunNativeAppAlgorithmClient(
     NativeAppAlgorithmEndpoint_t Local;
     NativeAppAlgorithmEndpoint_t Remote;
     NativeAppAlgorithmJsonWriter_t Writer;
+    NativeAppAlgorithmOptions_t EffectiveOptions;
+    char acRunId[NATIVE_APP_ALGORITHM_RUN_ID_LENGTH];
+    char acResultDirectory[NATIVE_APP_PATH_LENGTH];
+    char acResultPath[NATIVE_APP_PATH_LENGTH];
+    const char *pcResultName;
+    FILE *pLog = NULL;
     uint32_t uiTotal;
     uint32_t uiAvailable;
     uint32_t uiRequested;
@@ -912,9 +1194,32 @@ IpsecError_t RunNativeAppAlgorithmClient(
     uiAvailable = uiTotal - pOptions->uiStart + 1U;
     uiRequested = (0U == pOptions->uiLimit) ? uiAvailable :
         ((pOptions->uiLimit < uiAvailable) ? pOptions->uiLimit : uiAvailable);
-    eError = InitializeNativeAppAlgorithmEndpoint(
+    EffectiveOptions = *pOptions;
+    eError = CreateNativeAppAlgorithmRunId(pOptions->eMode, acRunId,
+                                            sizeof(acRunId));
+    if (IPSEC_OK == eError) {
+        eError = OpenNativeAppAlgorithmRunLog(
+            pConfig, acRunId, "initiator", acResultDirectory,
+            sizeof(acResultDirectory), &pLog);
+    }
+    if (IPSEC_OK == eError) {
+        pcResultName = (NULL != pOptions->pcResultsPath) ?
+            strrchr(pOptions->pcResultsPath, '/') : NULL;
+        pcResultName = (NULL != pcResultName) ? pcResultName + 1U :
+            pOptions->pcResultsPath;
+        if ((NULL == pcResultName) || ('\0' == pcResultName[0])) {
+            pcResultName = "results.json";
+        }
+        eError = JoinNativeAppAlgorithmPath(
+            acResultPath, sizeof(acResultPath), acResultDirectory,
+            pcResultName);
+        EffectiveOptions.pcResultsPath = acResultPath;
+    }
+    if (IPSEC_OK == eError) {
+        eError = InitializeNativeAppAlgorithmEndpoint(
         pConfig->acLocalAddress, 0U == pOptions->uiPort ?
         NATIVE_APP_ALGORITHM_DEFAULT_PORT : pOptions->uiPort, &Local);
+    }
     if (IPSEC_OK == eError) {
         if (AF_INET == Local.Address.ss_family) {
             ((struct sockaddr_in *)&Local.Address)->sin_port = 0U;
@@ -934,21 +1239,25 @@ IpsecError_t RunNativeAppAlgorithmClient(
         eError = LoadNativeAppCredential(pContext, pConfig);
     }
     if (IPSEC_OK == eError) {
-        eError = OpenNativeAppAlgorithmJson(pOptions, uiRequested, &Writer);
+        eError = OpenNativeAppAlgorithmJson(&EffectiveOptions, acRunId,
+                                            uiRequested, &Writer);
     }
     if (IPSEC_OK != eError) {
         if (0 <= iSocket) {
             (void)close(iSocket);
         }
+        if (NULL != pLog) {
+            (void)fclose(pLog);
+        }
         return eError;
     }
 
-    (void)printf("algorithm test: mode=%s start=%" PRIu32
-                 " cases=%" PRIu32 " results=%s\n",
-                 GetNativeAppAlgorithmModeName(pOptions->eMode),
-                 pOptions->uiStart, uiRequested,
-                 (NULL != pOptions->pcResultsPath) ?
-                 pOptions->pcResultsPath : "results.json");
+    ReportNativeAppAlgorithm(
+        pLog, stdout, "INFO",
+        "algorithm test: run=%s mode=%s start=%" PRIu32
+        " cases=%" PRIu32 " results=%s",
+        acRunId, GetNativeAppAlgorithmModeName(pOptions->eMode),
+        pOptions->uiStart, uiRequested, acResultPath);
     for (uiOffset = 0U;
          (uiOffset < uiRequested) && !IsNativeAppStopRequested();
          uiOffset++) {
@@ -960,19 +1269,25 @@ IpsecError_t RunNativeAppAlgorithmClient(
             pOptions->eMode, uiIndex, pConfig, pOptions->pcCustomIke,
             pOptions->pcCustomEsp, &Result.Case);
         if (IPSEC_OK == eError) {
-            (void)printf("[%" PRIu32 "/%" PRIu32 "] %s\n",
-                         uiOffset + 1U, uiRequested, Result.Case.acId);
+            ReportNativeAppAlgorithm(
+                pLog, stdout, "INFO", "[%" PRIu32 "/%" PRIu32 "] %s",
+                uiOffset + 1U, uiRequested, Result.Case.acId);
             eError = RunNativeAppAlgorithmCaseClient(
-                pContext, iSocket, &Remote, pConfig, &Result.Case, &Result);
+                pContext, iSocket, &Remote, pConfig, acRunId, &Result.Case,
+                &Result);
         }
         else {
             Result.eResult = NATIVE_APP_ALGORITHM_RESULT_FAIL_CONFIG;
             Result.eError = eError;
         }
         Result.ullDurationMs = GetNativeAppAlgorithmTimeMs() - ullStartMs;
-        (void)printf("  result=%s duration=%" PRIu64 " ms\n",
-                     GetNativeAppAlgorithmResultName(Result.eResult),
-                     Result.ullDurationMs);
+        ReportNativeAppAlgorithm(
+            pLog, stdout,
+            (NATIVE_APP_ALGORITHM_RESULT_PASS == Result.eResult) ?
+            "PASS" : "FAIL",
+            "result=%s case=%s duration=%" PRIu64 " ms error=%s",
+            GetNativeAppAlgorithmResultName(Result.eResult), Result.Case.acId,
+            Result.ullDurationMs, GetIpsecErrorString(Result.eError));
         if (IPSEC_OK != AppendNativeAppAlgorithmJson(&Writer, &Result)) {
             eError = IPSEC_ERR_FILE_READ;
         }
@@ -990,11 +1305,23 @@ IpsecError_t RunNativeAppAlgorithmClient(
     if (IsNativeAppStopRequested() && (IPSEC_OK == eFirstError)) {
         eFirstError = IPSEC_ERR_INTERNAL;
     }
-    (void)printf("algorithm summary: completed=%" PRIu32
-                 " passed=%" PRIu32 " failed=%" PRIu32 "\n",
-                 Writer.uiCaseCount, Writer.uiPassed, Writer.uiFailed);
+    ReportNativeAppAlgorithm(
+        pLog, stdout, (0U == Writer.uiFailed) ? "PASS" : "FAIL",
+        "algorithm summary: completed=%" PRIu32
+        " passed=%" PRIu32 " failed=%" PRIu32,
+        Writer.uiCaseCount, Writer.uiPassed, Writer.uiFailed);
     CloseNativeAppAlgorithmJson(&Writer);
+    eError = FinishNativeAppAlgorithmRun(iSocket, &Remote, acRunId,
+                                         pConfig->uiTimeoutMs);
+    if ((IPSEC_OK != eError) && (IPSEC_OK == eFirstError)) {
+        eFirstError = eError;
+    }
+    ReportNativeAppAlgorithm(
+        pLog, stdout, (IPSEC_OK == eError) ? "INFO" : "WARN",
+        "responder completion: %s", GetIpsecErrorString(eError));
+    ReportNativeAppAlgorithmFinalState(pContext, pLog);
     (void)close(iSocket);
+    (void)fclose(pLog);
     return eFirstError;
 }
 
@@ -1030,6 +1357,7 @@ static IpsecError_t RunNativeAppAlgorithmServerCase(
     uint64_t ullTimeoutMs = (uint64_t)pBaseConfig->uiTimeoutMs * 2U;
     bool bConnectionLoaded = false;
     bool bVerified = false;
+    IpsecError_t eCaseError = IPSEC_OK;
     IpsecError_t eError;
 
     Result.Case = *pCase;
@@ -1075,17 +1403,21 @@ static IpsecError_t RunNativeAppAlgorithmServerCase(
                 iSocket, &ActualSender, "READY", pCase, "OK");
         }
         else if (0 == strcmp("VERIFY", pacFields[1])) {
-            eError = QueryNativeAppAlgorithmState(pContext, &Config, pCase,
-                                                  &Result);
-            if (IPSEC_OK == eError) {
+            IpsecError_t eVerify = QueryNativeAppAlgorithmState(
+                pContext, &Config, pCase, &Result);
+            IpsecError_t eReply;
+
+            if (IPSEC_OK == eVerify) {
                 Result.eResult = NATIVE_APP_ALGORITHM_RESULT_PASS;
             }
             else {
                 /* QueryNativeAppAlgorithmState set the failure stage. */
             }
-            eError = ReplyNativeAppAlgorithmServer(
+            eReply = ReplyNativeAppAlgorithmServer(
                 iSocket, &ActualSender, "RESULT", pCase,
                 GetNativeAppAlgorithmResultName(Result.eResult));
+            eCaseError = eVerify;
+            eError = eReply;
             bVerified = true;
         }
         else if ((0 == strcmp("CLEANUP", pacFields[1])) ||
@@ -1127,6 +1459,12 @@ static IpsecError_t RunNativeAppAlgorithmServerCase(
     if ((IPSEC_OK == eError) && !bVerified) {
         eError = IPSEC_ERR_VICI_TIMEOUT;
     }
+    else if ((IPSEC_OK == eError) && (IPSEC_OK != eCaseError)) {
+        eError = eCaseError;
+    }
+    else {
+        /* Preserve protocol or verification result. */
+    }
     return eError;
 }
 
@@ -1137,7 +1475,11 @@ IpsecError_t RunNativeAppAlgorithmServer(
 {
     NativeAppAlgorithmEndpoint_t Local;
     NativeAppAlgorithmEndpoint_t Peer;
+    char acRunId[NATIVE_APP_ALGORITHM_RUN_ID_LENGTH] = {0};
+    char acResultDirectory[NATIVE_APP_PATH_LENGTH] = {0};
+    FILE *pLog = NULL;
     int32_t iSocket = -1;
+    bool bRunCompleted = false;
     IpsecError_t eError;
 
     if ((NULL == pContext) || (NULL == pConfig) ||
@@ -1167,10 +1509,11 @@ IpsecError_t RunNativeAppAlgorithmServer(
         return eError;
     }
 
-    (void)printf("algorithm responder ready: %s:%" PRIu32
-                 " peer=%s (Ctrl-C to stop)\n",
-                 pConfig->acLocalAddress, uiPort,
-                 pConfig->acRemoteAddress);
+    ReportNativeAppAlgorithm(
+        NULL, stdout, "INFO",
+        "algorithm responder ready: %s:%" PRIu32
+        " peer=%s (Ctrl-C to stop)",
+        pConfig->acLocalAddress, uiPort, pConfig->acRemoteAddress);
     while (!IsNativeAppStopRequested()) {
         char acMessage[NATIVE_APP_ALGORITHM_MESSAGE_LENGTH];
         char *pacFields[8];
@@ -1193,9 +1536,56 @@ IpsecError_t RunNativeAppAlgorithmServer(
         }
         if (!SplitNativeAppAlgorithmMessage(
                 acMessage, pacFields, NATIVE_APP_ARRAY_COUNT(pacFields),
-                &uiFieldCount) || (5U > uiFieldCount) ||
-            (0 != strcmp("PREPARE", pacFields[1]))) {
+                &uiFieldCount) || (3U > uiFieldCount)) {
             continue;
+        }
+        if ((0 == strcmp("FINISH", pacFields[1])) &&
+            ('\0' != acRunId[0]) &&
+            (0 == strcmp(acRunId, pacFields[2]))) {
+            eError = CopyNativeAppAlgorithmValue(
+                Case.acId, sizeof(Case.acId), pacFields[2]);
+            if (IPSEC_OK == eError) {
+                eError = ReplyNativeAppAlgorithmServer(
+                    iSocket, &Sender, "FINISHED", &Case, "OK");
+            }
+            if (IPSEC_OK == eError) {
+                ReportNativeAppAlgorithmFinalState(pContext, pLog);
+                ReportNativeAppAlgorithm(
+                    pLog, stdout, "INFO",
+                    "algorithm responder completed: run=%s results=%s",
+                    acRunId, acResultDirectory);
+                bRunCompleted = true;
+            }
+            break;
+        }
+        else if ((0 != strcmp("PREPARE", pacFields[1])) ||
+                 (6U > uiFieldCount) ||
+                 !IsNativeAppAlgorithmRunIdValid(pacFields[5])) {
+            continue;
+        }
+        else if ('\0' == acRunId[0]) {
+            eError = CopyNativeAppAlgorithmValue(
+                acRunId, sizeof(acRunId), pacFields[5]);
+            if (IPSEC_OK == eError) {
+                eError = OpenNativeAppAlgorithmRunLog(
+                    pConfig, acRunId, "responder", acResultDirectory,
+                    sizeof(acResultDirectory), &pLog);
+            }
+            if (IPSEC_OK == eError) {
+                ReportNativeAppAlgorithm(
+                    pLog, stdout, "INFO",
+                    "algorithm responder run started: run=%s results=%s",
+                    acRunId, acResultDirectory);
+            }
+        }
+        else if (0 != strcmp(acRunId, pacFields[5])) {
+            continue;
+        }
+        else {
+            eError = IPSEC_OK;
+        }
+        if (IPSEC_OK != eError) {
+            break;
         }
         eError = CopyNativeAppAlgorithmValue(Case.acId, sizeof(Case.acId),
                                              pacFields[2]);
@@ -1220,20 +1610,34 @@ IpsecError_t RunNativeAppAlgorithmServer(
             }
         }
         if (IPSEC_OK == eError) {
-            (void)printf("responder case: %s ike=%s esp=%s\n",
-                         Case.acId, Case.acIkeProposal, Case.acEspProposal);
+            ReportNativeAppAlgorithm(
+                pLog, stdout, "INFO", "responder case: %s ike=%s esp=%s",
+                Case.acId, Case.acIkeProposal, Case.acEspProposal);
             eError = RunNativeAppAlgorithmServerCase(
                 pContext, iSocket, &Peer, &Sender, pConfig, &Case);
-            (void)printf("responder result: %s %s\n", Case.acId,
-                         (IPSEC_OK == eError) ? "PASS" :
-                         GetIpsecErrorString(eError));
+            ReportNativeAppAlgorithm(
+                pLog, (IPSEC_OK == eError) ? stdout : stderr,
+                (IPSEC_OK == eError) ? "PASS" : "FAIL",
+                "responder result: %s %s", Case.acId,
+                (IPSEC_OK == eError) ? "PASS" :
+                GetIpsecErrorString(eError));
         }
         if ((IPSEC_OK != eError) && !IsNativeAppStopRequested()) {
-            (void)fprintf(stderr, "algorithm responder case failed: %s\n",
-                          GetIpsecErrorString(eError));
+            ReportNativeAppAlgorithm(
+                pLog, stderr, "FAIL", "algorithm responder case failed: %s",
+                GetIpsecErrorString(eError));
             eError = IPSEC_OK;
         }
     }
     (void)close(iSocket);
-    return IsNativeAppStopRequested() ? IPSEC_OK : eError;
+    if (NULL != pLog) {
+        (void)fclose(pLog);
+    }
+    if (IsNativeAppStopRequested() || bRunCompleted) {
+        eError = IPSEC_OK;
+    }
+    else {
+        /* Preserve the responder transport or result-file error. */
+    }
+    return eError;
 }

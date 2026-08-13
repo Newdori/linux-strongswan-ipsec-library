@@ -343,6 +343,30 @@ static IpsecError_t AppendSaProposal(
                            pElement->usValueLength, "/");
 }
 
+static IpsecError_t AppendSaKeySize(
+    char *pcProposal,
+    size_t zProposalLength,
+    const ViciElement_t *pElement)
+{
+    uint32_t uiKeySize;
+    IpsecError_t eError;
+
+    eError = ParseIpsecUint32(pElement->pucValue, pElement->usValueLength,
+                              &uiKeySize, 10U);
+    if ((IPSEC_OK == eError) && (0U == uiKeySize)) {
+        eError = IPSEC_ERR_VICI_PROTOCOL;
+    }
+    else if (IPSEC_OK == eError) {
+        eError = AppendIpsecText(pcProposal, zProposalLength,
+                                 pElement->pucValue,
+                                 pElement->usValueLength, "-");
+    }
+    else {
+        /* Preserve malformed VICI key-size data. */
+    }
+    return eError;
+}
+
 static IpsecError_t CollectIkeValue(
     SaCollector_t *pCollector,
     const ViciElement_t *pElement)
@@ -421,6 +445,13 @@ static IpsecError_t CollectIkeValue(
                          "dh-group")) {
         eError = AppendSaProposal(pInfo->acProposal,
                                   sizeof(pInfo->acProposal), pElement);
+    }
+    else if (MatchSaText(pElement->pucName, pElement->ucNameLength,
+                         "encr-keysize") ||
+             MatchSaText(pElement->pucName, pElement->ucNameLength,
+                         "integ-keysize")) {
+        eError = AppendSaKeySize(pInfo->acProposal,
+                                 sizeof(pInfo->acProposal), pElement);
     }
     else {
         /* Ignore optional IKE fields. */
@@ -530,6 +561,13 @@ static IpsecError_t CollectChildValue(
                          "dh-group")) {
         eError = AppendSaProposal(pInfo->acProposal,
                                   sizeof(pInfo->acProposal), pElement);
+    }
+    else if (MatchSaText(pElement->pucName, pElement->ucNameLength,
+                         "encr-keysize") ||
+             MatchSaText(pElement->pucName, pElement->ucNameLength,
+                         "integ-keysize")) {
+        eError = AppendSaKeySize(pInfo->acProposal,
+                                 sizeof(pInfo->acProposal), pElement);
     }
     else {
         /* Ignore optional CHILD fields. */

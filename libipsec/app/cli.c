@@ -306,6 +306,7 @@ static void ShowNativeAppConfig(const NativeAppSession_t *pSession)
         "  Local ID         : %s\n"
         "  Remote ID        : %s\n"
         "  PSK File         : %s\n"
+        "  Output Root      : %s\n"
         "  VICI URI         : unix://%s\n"
         "  Connection Name  : %s\n"
         "  CHILD Name       : %s\n"
@@ -320,7 +321,7 @@ static void ShowNativeAppConfig(const NativeAppSession_t *pSession)
         pSession->bConfigValid ? "yes" : "no",
         GetNativeAppRoleText(pConfig->eRole), pConfig->acLocalAddress,
         pConfig->acRemoteAddress, pConfig->acLocalId, pConfig->acRemoteId,
-        pConfig->acPskFile, pConfig->acViciSocket,
+        pConfig->acPskFile, pConfig->acOutputRoot, pConfig->acViciSocket,
         pConfig->acConnectionName, pConfig->acChildName,
         pConfig->acIkeProposals, pConfig->acEspProposals,
         GetNativeAppModeText(pConfig->eMode),

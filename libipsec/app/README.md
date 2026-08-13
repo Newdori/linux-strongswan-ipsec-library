@@ -206,6 +206,13 @@ response are exchanged after CHILD installation, so a passing case also
 confirms traffic in both directions across the installed policy. Use the same
 `--port N` value on both peers to override the default.
 
+`test algorithm serve` owns the PC-B CLI while it is waiting for a run, so
+commands typed during that wait are not CLI commands. On normal completion,
+PC-A sends a `FINISH` message and PC-B automatically returns to the `ipsec>`
+prompt. Ctrl-C remains available to stop a responder whose initiator ended
+abnormally. Run `show connections`, `show ike`, `show child`, and
+`show xfrm-state` only after the prompt has returned.
+
 Each case loads a connection, establishes IKE/CHILD, checks the negotiated
 proposals, checks PFS and ESN when requested, verifies matching XFRM state and
 policy, tests the protected data path, terminates the SA, verifies removal,
@@ -213,9 +220,23 @@ and unloads the connection. PSK credentials are loaded once per test process
 and are not cleared automatically because VICI credential clearing is
 daemon-wide.
 
-The default output file is `results.json`. It is checkpointed after every case
-and remains in the directory where `ipsec_app` was started even after a test
-failure or Ctrl-C. Select another retained file with `--results FILE`:
+Every run creates v15-style result directories under `output_root`, which
+defaults to `./results`. PC-A sends its run ID to PC-B so corresponding folders
+use the same timestamp and mode:
+
+```text
+results/baseline_20260813_143000_1234_initiator/
+    application.log
+    results.json
+results/baseline_20260813_143000_1234_responder/
+    application.log
+```
+
+`results.json` is checkpointed after every case and remains available after a
+test failure or Ctrl-C. `--results FILE` selects its filename inside the newly
+created initiator result directory; directory components are intentionally
+ignored. Change the root before running with `config set output_root DIR` or
+the v15-compatible `output_root=DIR` configuration setting:
 
 ```text
 ipsec> test algorithm run baseline --all --results baseline-results.json
@@ -228,5 +249,5 @@ Exhaustive modes intentionally default to ten cases; use `--all` for the full
 catalog or `--start`/`--limit` to split a long run. Tests continue after a
 failed algorithm by default so JSON captures the whole requested range. Add
 `--stop-on-error` for a diagnostic run that should stop at the first failure.
-A new run to the same output path replaces the previous contents, so use
-distinct result names for separate or resumed ranges.
+Each run uses a new timestamped directory, so previous JSON and application
+logs are retained.
