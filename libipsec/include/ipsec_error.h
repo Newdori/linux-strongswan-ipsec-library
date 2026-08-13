@@ -27,7 +27,10 @@ typedef enum IpsecError {
     IPSEC_ERR_PERMISSION,
     IPSEC_ERR_BUFFER_TOO_SMALL,
     IPSEC_ERR_NOT_SUPPORTED,
-    IPSEC_ERR_INTERNAL
+    IPSEC_ERR_INTERNAL,
+    IPSEC_ERR_FILE_WRITE,
+    IPSEC_ERR_FILE_EXISTS,
+    IPSEC_ERR_RANDOM
 } IpsecError_t;
 
 const char *GetIpsecErrorString(IpsecError_t eError);

@@ -10,6 +10,11 @@ extern "C" {
 
 typedef struct IpsecContext IpsecContext_t;
 
+#define IPSEC_GENERATED_PSK_BYTE_LENGTH 48U
+
+IpsecError_t GenerateIpsecPskFile(
+    const char *pcPath);
+
 IpsecError_t InitializeIpsec(
     IpsecContext_t **ppContext,
     const IpsecConfig_t *pConfig);

@@ -139,6 +139,9 @@ typedef struct IpsecPsk {
     IpsecStringListView_t Owners;
 } IpsecPsk_t;
 
+IpsecError_t GenerateIpsecPskFile(
+    const char *pcPath);
+
 IpsecError_t AddIpsecPsk(
     IpsecContext_t *pContext,
     const IpsecPsk_t *pPsk);
@@ -148,6 +151,12 @@ IpsecError_t ClearIpsecCredentials(
 ```
 
 PSK pointer는 호출 중에만 읽는다. library는 PSK를 context에 보관하지 않는다. VICI request용 임시 buffer는 전송 직후 안전하게 지운다.
+
+`GenerateIpsecPskFile()`은 charon context 없이 호출할 수 있다. Linux
+`getrandom` system call을 우선 사용하고 지원되지 않는 환경에서는
+`/dev/urandom`을 사용하여 48바이트를 생성한다. 결과는 96자리 소문자
+hex와 개행으로 기록하며 파일 권한은 `0600`이다. 기존 경로는 덮어쓰지
+않고 `IPSEC_ERR_FILE_EXISTS`를 반환한다.
 
 향후 certificate/private key API는 별도 typed credential 구조체와 함수로 추가한다.
 

@@ -37,6 +37,7 @@ SRCIPSEC = \
 	core/ipsec.c \
 	core/log.c \
 	core/netlink.c \
+	core/psk.c \
 	core/util.c \
 	vici/vici_algorithm.c \
 	vici/vici_client.c \

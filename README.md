@@ -16,7 +16,7 @@ under the Apache License 2.0. See [LICENSE](LICENSE),
 
 - strongSwan 5.8.4 or newer VICI baseline
 - IKEv2 connection load, unload, and list
-- PSK load and VICI credential clear
+- secure PSK file generation, PSK load, and VICI credential clear
 - IKE/CHILD initiate, terminate, rekey, and wait
 - IKE/CHILD/algorithm/daemon structured status
 - read-only XFRM state, policy, and statistics

@@ -108,7 +108,7 @@ v15에는 IKE/CHILD rekey API가 없고 lifetime/rekey time도 설정하지 않�
 - credential 파일을 mode 0600으로 만들고 적재 후 삭제한다.
 - stack PSK buffer를 cleanup에서 `memset()`한다.
 
-신규 구현에서 유지할 것은 길이/입력 검증과 비밀 로그 금지다. 파일 생성은 제거하고 raw bytes를 VICI `load-shared`의 `data`로 전송한다. 단순 `memset()`은 최적화로 제거될 수 있으므로 `explicit_bzero()` 사용 가능 여부를 감싸는 secure-zero helper를 제공한다. public API는 PSK의 소유권과 호출 후 유효기간을 명시하고, 내부 복사는 최소화한다.
+신규 구현에서는 길이/입력 검증과 비밀 로그 금지를 유지한다. 제품 초기 설정을 위해 Native 난수 기반 `GenerateIpsecPskFile()`을 제공하고, 생성된 파일을 읽은 raw bytes는 VICI `load-shared`의 `data`로 전송한다. 단순 `memset()`은 최적화로 제거될 수 있으므로 secure-zero helper를 사용한다. public API는 PSK의 소유권과 호출 후 유효기간을 명시하고, 내부 복사는 최소화한다.
 
 ## 7. SA 상태와 lifecycle 의미
 
@@ -188,7 +188,7 @@ v15의 상태 판정은 `swanctl --list-sas`의 포맷된 문자열을 읽어 �
 - `src/report.c` 전체
 - peer barrier, result directory, CSV, strict/capture verdict
 - tcpdump/pcap/평문 탐지
-- 시험 PSK 생성 CLI와 wrapper script
+- 시험 전용 wrapper script
 - systemd/charon process lifecycle 관리
 
 알고리즘 catalog는 runtime 제품 기능이 아니라 unit/integration test fixture 또는 별도 참고 자료로만 둘 수 있다.

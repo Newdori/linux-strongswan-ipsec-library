@@ -1,6 +1,7 @@
 IPSEC_NATIVE_0.1 {
     global:
         GetIpsecErrorString;
+        GenerateIpsecPskFile;
         InitializeIpsec;
         DeinitializeIpsec;
         AddIpsecConnection;

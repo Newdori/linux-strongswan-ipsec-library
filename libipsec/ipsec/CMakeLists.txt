@@ -16,6 +16,7 @@ set(IPSEC_NATIVE_SOURCES
     core/ipsec.c
     core/log.c
     core/netlink.c
+    core/psk.c
     core/util.c
     vici/vici_algorithm.c
     vici/vici_client.c
@@ -171,6 +172,21 @@ if(BUILD_TESTING)
     target_include_directories(test_app_command PRIVATE
         ../include ../app)
     add_test(NAME app_command COMMAND test_app_command)
+
+    add_executable(test_psk_generate
+        ../tests/unit/test_psk_generate.c)
+    set_target_properties(test_psk_generate PROPERTIES
+        C_STANDARD 11
+        C_STANDARD_REQUIRED YES
+        C_EXTENSIONS NO)
+    target_compile_definitions(test_psk_generate PRIVATE
+        _POSIX_C_SOURCE=200809L)
+    target_compile_options(test_psk_generate PRIVATE
+        -Wall -Wextra -Wpedantic -Werror)
+    target_include_directories(test_psk_generate PRIVATE
+        ../include)
+    target_link_libraries(test_psk_generate PRIVATE ipsec_native_static)
+    add_test(NAME psk_generate COMMAND test_psk_generate)
 
     add_executable(test_vici_packet
         ../tests/unit/test_vici_packet.c

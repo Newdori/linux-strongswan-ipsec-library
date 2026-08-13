@@ -47,6 +47,20 @@ app/obj/zynqmp/*.o
 app/bin/zynqmp/ipsec_app
 ```
 
+## Generate a PSK file
+
+Generate the shared PSK once on either peer before starting a VICI session:
+
+```sh
+./app/bin/x86_64/ipsec_app --generate-psk /home/user/IPsec/ipsec_test.psk
+```
+
+This action does not connect to charon. The library obtains 48 random bytes,
+writes them as 96 lowercase hexadecimal characters plus a newline, and sets
+the file permission to `0600`. An existing path is never overwritten. Copy
+the same generated file to the other peer over a secure channel and point
+both endpoint configurations at their local copy with `psk_file`.
+
 ## Start a session
 
 Start with an existing v15 endpoint configuration:

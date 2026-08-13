@@ -68,9 +68,20 @@ const char *GetIpsecErrorString(IpsecError_t eError)
     case IPSEC_ERR_NOT_SUPPORTED:
         pcMessage = "operation is not supported";
         break;
+    case IPSEC_ERR_FILE_WRITE:
+        pcMessage = "file write failed";
+        break;
+    case IPSEC_ERR_FILE_EXISTS:
+        pcMessage = "file already exists";
+        break;
+    case IPSEC_ERR_RANDOM:
+        pcMessage = "secure random generation failed";
+        break;
     case IPSEC_ERR_INTERNAL:
-    default:
         pcMessage = "internal error";
+        break;
+    default:
+        pcMessage = "unknown error";
         break;
     }
 

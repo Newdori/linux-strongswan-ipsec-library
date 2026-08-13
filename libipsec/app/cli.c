@@ -7,6 +7,7 @@
 
 typedef struct NativeAppStartupOptions {
     const char *pcConfigPath;
+    const char *pcGeneratePskPath;
     int32_t iCommandIndex;
     bool bVerbose;
     bool bHelp;
@@ -86,10 +87,13 @@ static void PrintNativeAppUsage(const char *pcProgram)
 {
     (void)printf(
         "Usage: %s [--config FILE] [--verbose] [COMMAND ...]\n"
+        "       %s --generate-psk FILE\n"
         "\n"
         "Without COMMAND, ipsec_app starts an interactive CLI session.\n"
-        "The application connects to charon before accepting commands.\n",
-        pcProgram);
+        "The application connects to charon before accepting commands.\n"
+        "--generate-psk creates a new 48-byte hex PSK file without\n"
+        "connecting to charon and never overwrites an existing file.\n",
+        pcProgram, pcProgram);
 }
 
 static void PrintNativeAppHelp(void)
@@ -161,6 +165,16 @@ static bool ParseNativeAppStartupOptions(
             if ((iIndex + 1) < iArgumentCount) {
                 iIndex++;
                 pOptions->pcConfigPath = ppcArguments[iIndex];
+                iIndex++;
+            }
+            else {
+                bParsed = false;
+            }
+        }
+        else if (0 == strcmp("--generate-psk", pcArgument)) {
+            if ((iIndex + 1) < iArgumentCount) {
+                iIndex++;
+                pOptions->pcGeneratePskPath = ppcArguments[iIndex];
                 iIndex++;
             }
             else {
@@ -1283,6 +1297,27 @@ int32_t RunNativeAppCli(
         PrintNativeAppUsage(ppcArguments[0]);
         PrintNativeAppHelp();
         return 0;
+    }
+    else if (NULL != Options.pcGeneratePskPath) {
+        if ((NULL != Options.pcConfigPath) ||
+            (Options.iCommandIndex < iArgumentCount)) {
+            PrintNativeAppUsage(ppcArguments[0]);
+            return 2;
+        }
+        else {
+            /* PSK generation is a standalone action without VICI. */
+        }
+        eError = GenerateIpsecPskFile(Options.pcGeneratePskPath);
+        if (IPSEC_OK == eError) {
+            (void)printf("PSK generated: %s\n",
+                         Options.pcGeneratePskPath);
+            return 0;
+        }
+        else {
+            (void)fprintf(stderr, "PSK generation failed: %s\n",
+                          GetIpsecErrorString(eError));
+            return 1;
+        }
     }
     else {
         (void)memset(&Session, 0, sizeof(Session));
