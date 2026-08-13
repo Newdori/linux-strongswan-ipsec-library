@@ -43,6 +43,7 @@ SOURCES = \
 	command.c \
 	config.c \
 	lifecycle.c \
+	peer.c \
 	show.c \
 	main.c
 

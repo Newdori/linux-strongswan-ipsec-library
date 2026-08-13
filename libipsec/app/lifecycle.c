@@ -54,7 +54,8 @@ IpsecError_t LoadNativeAppCredential(
     }
     pacOwners[0] = pConfig->acLocalId;
     pacOwners[1] = pConfig->acRemoteId;
-    Psk.pcId = pConfig->acConnectionName;
+    Psk.pcId = ('\0' != pConfig->acCredentialId[0]) ?
+        pConfig->acCredentialId : pConfig->acConnectionName;
     Psk.pucData = Secret.pucData;
     Psk.uiDataLength = Secret.uiLength;
     Psk.Owners.ppcItems = pacOwners;

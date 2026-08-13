@@ -199,6 +199,15 @@ IpsecError_t SetNativeAppConfigSetting(
         bAccepted = CopyNativeAppText(pConfig->acChildName,
                                      sizeof(pConfig->acChildName), pcValue);
     }
+    else if (0 == strcmp("credential_id", pcKey)) {
+        bAccepted = CopyNativeAppText(pConfig->acCredentialId,
+                                     sizeof(pConfig->acCredentialId), pcValue);
+    }
+    else if (0 == strcmp("peer_server_ip", pcKey)) {
+        bAccepted = CopyNativeAppText(pConfig->acPeerServerAddress,
+                                     sizeof(pConfig->acPeerServerAddress),
+                                     pcValue);
+    }
     else if (0 == strcmp("ike_proposals", pcKey)) {
         bAccepted = CopyNativeAppText(pConfig->acIkeProposals,
                                      sizeof(pConfig->acIkeProposals), pcValue);
@@ -237,6 +246,11 @@ IpsecError_t SetNativeAppConfigSetting(
         else {
             /* Preserve the invalid numeric result. */
         }
+    }
+    else if (0 == strcmp("peer_port", pcKey)) {
+        bAccepted = ParseNativeAppUint32(pcValue, &pConfig->uiPeerPort) &&
+                    (0U < pConfig->uiPeerPort) &&
+                    (UINT16_MAX >= pConfig->uiPeerPort);
     }
     else if (IsNativeAppIgnoredV15Key(pcKey)) {
         /* Accepted for direct reuse of v15 configuration files. */
@@ -313,6 +327,7 @@ void InitializeNativeAppConfig(NativeAppConfig_t *pConfig)
         pConfig->eRole = NATIVE_APP_ROLE_INITIATOR;
         pConfig->eMode = IPSEC_MODE_TUNNEL;
         pConfig->uiTimeoutMs = 30000U;
+        pConfig->uiPeerPort = NATIVE_APP_PEER_DEFAULT_PORT;
         (void)CopyNativeAppText(pConfig->acOutputRoot,
                                sizeof(pConfig->acOutputRoot), "./results");
         (void)CopyNativeAppText(pConfig->acViciSocket,
@@ -322,6 +337,247 @@ void InitializeNativeAppConfig(NativeAppConfig_t *pConfig)
     else {
         /* Nothing to initialize. */
     }
+}
+
+typedef IpsecError_t (*NativeAppConfigSetter_t)(
+    NativeAppConfig_t *pConfig,
+    const char *pcKey,
+    const char *pcValue);
+
+static bool IsNativeAppApplicationKey(const char *pcKey)
+{
+    static const char *pacKeys[] = {
+        "role", "local_ip", "local_id", "psk_file", "output_root",
+        "vici_uri", "childless_ike", "terminate_on_exit",
+        "command_timeout_sec", "timeout_sec", "peer_server_ip",
+        "peer_port"
+    };
+    uint32_t uiIndex;
+
+    for (uiIndex = 0U;
+         uiIndex < (uint32_t)(sizeof(pacKeys) / sizeof(pacKeys[0]));
+         uiIndex++) {
+        if (0 == strcmp(pacKeys[uiIndex], pcKey)) {
+            return true;
+        }
+        else {
+            /* Check the next application setting. */
+        }
+    }
+    return false;
+}
+
+static IpsecError_t SetNativeAppApplicationSetting(
+    NativeAppConfig_t *pConfig,
+    const char *pcKey,
+    const char *pcValue)
+{
+    if (!IsNativeAppApplicationKey(pcKey)) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    else {
+        return SetNativeAppConfigSetting(pConfig, pcKey, pcValue);
+    }
+}
+
+static IpsecError_t SetNativeAppManagementSetting(
+    NativeAppConfig_t *pConfig,
+    const char *pcKey,
+    const char *pcValue)
+{
+    if ((0 != strcmp("ike_proposals", pcKey)) &&
+        (0 != strcmp("esp_proposals", pcKey)) &&
+        (0 != strcmp("ipsec_mode", pcKey))) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    else {
+        return SetNativeAppConfigSetting(pConfig, pcKey, pcValue);
+    }
+}
+
+static IpsecError_t LoadNativeAppSettingsFile(
+    const char *pcPath,
+    NativeAppConfig_t *pConfig,
+    NativeAppConfigSetter_t pSetter,
+    char *pcError,
+    uint32_t uiErrorLength)
+{
+    FILE *pFile;
+    char acLine[NATIVE_APP_LINE_LENGTH];
+    IpsecError_t eError = IPSEC_OK;
+
+    pFile = fopen(pcPath, "r");
+    if (NULL == pFile) {
+        SetNativeAppError(pcError, uiErrorLength,
+                          "cannot open configuration: %s", pcPath);
+        return IPSEC_ERR_FILE_OPEN;
+    }
+    else {
+        /* Parse the opened settings file. */
+    }
+
+    while ((IPSEC_OK == eError) &&
+           (NULL != fgets(acLine, sizeof(acLine), pFile))) {
+        char *pcKey;
+        char *pcValue;
+        char *pcSeparator;
+        size_t zLength = strlen(acLine);
+
+        if ((0U < zLength) && ('\n' != acLine[zLength - 1U]) &&
+            (0 == feof(pFile))) {
+            eError = IPSEC_ERR_BUFFER_TOO_SMALL;
+            SetNativeAppError(pcError, uiErrorLength,
+                              "configuration line is too long: %s", pcPath);
+            break;
+        }
+        else {
+            /* The complete line is in the bounded buffer. */
+        }
+        pcKey = TrimNativeAppText(acLine);
+        if (('#' == pcKey[0]) || (';' == pcKey[0]) ||
+            ('\0' == pcKey[0])) {
+            continue;
+        }
+        else {
+            /* Parse a key/value setting. */
+        }
+        pcSeparator = strchr(pcKey, '=');
+        if (NULL == pcSeparator) {
+            eError = IPSEC_ERR_INVALID_ARGUMENT;
+            SetNativeAppError(pcError, uiErrorLength,
+                              "setting has no '=' near: %s", pcKey);
+            break;
+        }
+        else {
+            *pcSeparator = '\0';
+        }
+        pcValue = TrimNativeAppText(pcSeparator + 1U);
+        pcKey = TrimNativeAppText(pcKey);
+        eError = pSetter(pConfig, pcKey, pcValue);
+        if (IPSEC_OK != eError) {
+            SetNativeAppError(pcError, uiErrorLength,
+                              "unknown or invalid setting: %s", pcKey);
+        }
+        else {
+            /* Continue parsing. */
+        }
+    }
+    if ((IPSEC_OK == eError) && (0 != ferror(pFile))) {
+        eError = IPSEC_ERR_FILE_READ;
+        SetNativeAppError(pcError, uiErrorLength,
+                          "cannot read configuration: %s", pcPath);
+    }
+    else {
+        /* Preserve the parser result. */
+    }
+    (void)fclose(pFile);
+    return eError;
+}
+
+IpsecError_t ValidateNativeAppBaseConfig(
+    const NativeAppConfig_t *pConfig,
+    char *pcError,
+    uint32_t uiErrorLength)
+{
+    const char *pcInvalid = NULL;
+
+    if (NULL == pConfig) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    else if (!IsNativeAppAddressValid(pConfig->acLocalAddress)) {
+        pcInvalid = "local_ip";
+    }
+    else if ((NATIVE_APP_ROLE_INITIATOR == pConfig->eRole) &&
+             ('\0' == pConfig->acLocalId[0])) {
+        pcInvalid = "local_id";
+    }
+    else if ('\0' == pConfig->acPskFile[0]) {
+        pcInvalid = "psk_file";
+    }
+    else if (!IsNativeAppAddressValid(pConfig->acPeerServerAddress)) {
+        pcInvalid = "peer_server_ip";
+    }
+    else if ((0U == pConfig->uiPeerPort) ||
+             (UINT16_MAX < pConfig->uiPeerPort)) {
+        pcInvalid = "peer_port";
+    }
+    else if ('\0' == pConfig->acIkeProposals[0]) {
+        pcInvalid = "ike_proposals";
+    }
+    else if ('\0' == pConfig->acEspProposals[0]) {
+        pcInvalid = "esp_proposals";
+    }
+    else if (!((IPSEC_MODE_TUNNEL == pConfig->eMode) ||
+               (IPSEC_MODE_TRANSPORT == pConfig->eMode))) {
+        pcInvalid = "ipsec_mode";
+    }
+    else if (0U == pConfig->uiTimeoutMs) {
+        pcInvalid = "command_timeout_sec";
+    }
+    else {
+        /* The application and management settings are complete. */
+    }
+
+    if (NULL != pcInvalid) {
+        SetNativeAppError(pcError, uiErrorLength,
+                          "missing or invalid setting: %s", pcInvalid);
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    else {
+        return IPSEC_OK;
+    }
+}
+
+IpsecError_t LoadNativeAppConfigFiles(
+    const char *pcApplicationPath,
+    const char *pcManagementPath,
+    NativeAppConfig_t *pConfig,
+    char *pcError,
+    uint32_t uiErrorLength)
+{
+    IpsecError_t eError;
+
+    if ((NULL == pcApplicationPath) || (NULL == pcManagementPath) ||
+        (NULL == pConfig)) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    else {
+        InitializeNativeAppConfig(pConfig);
+    }
+    eError = LoadNativeAppSettingsFile(
+        pcApplicationPath, pConfig, SetNativeAppApplicationSetting,
+        pcError, uiErrorLength);
+    if ((IPSEC_OK == eError) &&
+        (NATIVE_APP_ROLE_INITIATOR == pConfig->eRole) &&
+        ('\0' == pConfig->acPeerServerAddress[0])) {
+        if (!CopyNativeAppText(pConfig->acPeerServerAddress,
+                               sizeof(pConfig->acPeerServerAddress),
+                               pConfig->acLocalAddress)) {
+            eError = IPSEC_ERR_BUFFER_TOO_SMALL;
+        }
+        else {
+            /* The initiator listens on its configured local address. */
+        }
+    }
+    if (IPSEC_OK == eError) {
+        pConfig->acIkeProposals[0] = '\0';
+        pConfig->acEspProposals[0] = '\0';
+        pConfig->eMode = (IpsecMode_t)-1;
+        eError = LoadNativeAppSettingsFile(
+            pcManagementPath, pConfig, SetNativeAppManagementSetting,
+            pcError, uiErrorLength);
+    }
+    else {
+        /* Preserve the application configuration error. */
+    }
+    if (IPSEC_OK == eError) {
+        eError = ValidateNativeAppBaseConfig(pConfig, pcError,
+                                             uiErrorLength);
+    }
+    else {
+        /* Preserve the management configuration error. */
+    }
+    return eError;
 }
 
 IpsecError_t LoadNativeAppConfig(

@@ -33,7 +33,9 @@ int main(int iArgumentCount, char **ppcArguments)
     else {
         eError = IPSEC_OK;
     }
-    for (iIndex = 1; iIndex < iArgumentCount; iIndex++) {
+    for (iIndex = 1;
+         iIndex < ((4 == iArgumentCount) ? 2 : iArgumentCount);
+         iIndex++) {
         eError = LoadNativeAppConfig(ppcArguments[iIndex], &Config, acError,
                                      sizeof(acError));
         if (IPSEC_OK == eError) {
@@ -67,7 +69,32 @@ int main(int iArgumentCount, char **ppcArguments)
             /* This configuration is compatible. */
         }
     }
-    (void)printf("v15 application configuration parser passed: %d files\n",
+    if (4 == iArgumentCount) {
+        eError = LoadNativeAppConfigFiles(
+            ppcArguments[2], ppcArguments[3], &Config, acError,
+            sizeof(acError));
+        if ((IPSEC_OK != eError) ||
+            (NATIVE_APP_ROLE_INITIATOR != Config.eRole) ||
+            (IPSEC_MODE_TRANSPORT != Config.eMode) ||
+            (60000U != Config.uiTimeoutMs) ||
+            (39002U != Config.uiPeerPort) ||
+            (0 != strcmp("192.0.2.10", Config.acPeerServerAddress)) ||
+            ('\0' != Config.acRemoteAddress[0]) ||
+            ('\0' != Config.acConnectionName[0]) ||
+            (0 != strcmp("aes256-sha256-prfsha256-modp2048",
+                         Config.acIkeProposals)) ||
+            (0 != strcmp("aes256-sha256", Config.acEspProposals))) {
+            return FailAppConfigTest(
+                "split application/management configuration mismatch");
+        }
+        else {
+            /* The split configuration remains incomplete until registration. */
+        }
+    }
+    else {
+        /* The legacy-only invocation remains supported. */
+    }
+    (void)printf("application configuration parser passed: %d files\n",
                  iArgumentCount - 1);
     return 0;
 }

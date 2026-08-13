@@ -63,6 +63,58 @@ both endpoint configurations at their local copy with `psk_file`.
 
 ## Start a session
 
+For application-to-application registration, use two configuration files.
+The application file contains local process settings. The temporary
+management file contains only `ike_proposals`, `esp_proposals`, and
+`ipsec_mode`, which a future management component will supply:
+
+```sh
+./app/bin/x86_64/ipsec_app \
+    --app-config ./app/config/application_initiator.conf.example \
+    --management-config ./app/config/management.conf.example
+```
+
+The initiator retains its fixed `local_id` because the responder uses that
+value as its remote IKE identity. The responder receives its session IKE
+identity in `rcst-GROUP_ID-LOGON_ID` form during registration, so its
+application configuration does not require `local_id`.
+
+`conn-`, `child-`, and `psk-` are fixed application prefixes and are not
+configuration settings. `psk_length_bytes` is unnecessary because PSK files
+are generated separately. `peer_discovery` is unnecessary because the role
+selects TCP listen or register behavior. The TCP channel never transfers the
+PSK. Generate one PSK file, securely copy it to the other host, and configure
+the local path on each side.
+
+On the initiator:
+
+```text
+ipsec> peer listen
+```
+
+While it is waiting, run this on the responder:
+
+```text
+ipsec> peer register
+```
+
+The responder sends its configured IPsec endpoint address. The initiator
+checks it against the TCP source address, generates non-persistent
+`uint32_t` group and logon IDs, returns the policy and controller identity,
+and both applications create matching in-memory peer profiles. Use `peer
+show` to inspect the table and `peer select rcst-GROUP_ID-LOGON_ID` to switch
+the profile used by the existing connection, credential, IKE, CHILD, `up`,
+and `down` commands.
+
+The listener accepts one responder per `peer listen` command so that control
+remains explicit in the interactive CLI. Run it again for each additional
+responder. The table and assigned IDs are deliberately not saved to a file;
+they are recreated after an application restart or re-registration.
+
+The registration channel is suitable for the isolated application test
+because it carries no PSK, but it is not authenticated. A product deployment
+must replace it with the authenticated management channel.
+
 Start with an existing v15 endpoint configuration:
 
 ```sh
@@ -104,6 +156,11 @@ child initiate [NAME]
 child terminate [NAME]
 child rekey [NAME]
 child wait [NAME]
+
+peer listen
+peer register
+peer show
+peer select PEER_ID
 
 show [SCOPE]
 show SCOPE detail [NAME]

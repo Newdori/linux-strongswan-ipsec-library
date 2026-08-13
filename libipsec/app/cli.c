@@ -7,6 +7,8 @@
 
 typedef struct NativeAppStartupOptions {
     const char *pcConfigPath;
+    const char *pcApplicationConfigPath;
+    const char *pcManagementConfigPath;
     const char *pcGeneratePskPath;
     int32_t iCommandIndex;
     bool bVerbose;
@@ -15,9 +17,13 @@ typedef struct NativeAppStartupOptions {
 
 typedef struct NativeAppSession {
     IpsecContext_t *pContext;
+    NativeAppConfig_t BaseConfig;
     NativeAppConfig_t Config;
     NativeAppRuntimeConfig_t Runtime;
+    NativeAppPeerTable_t PeerTable;
     char acConfigPath[NATIVE_APP_PATH_LENGTH];
+    char acApplicationConfigPath[NATIVE_APP_PATH_LENGTH];
+    char acManagementConfigPath[NATIVE_APP_PATH_LENGTH];
     bool bConfigValid;
     bool bConnectionLoaded;
     bool bCredentialLoaded;
@@ -86,21 +92,23 @@ static void LogNativeApp(
 static void PrintNativeAppUsage(const char *pcProgram)
 {
     (void)printf(
-        "Usage: %s [--config FILE] [--verbose] [COMMAND ...]\n"
+        "Usage: %s --app-config FILE --management-config FILE\n"
+        "          [--verbose] [COMMAND ...]\n"
+        "       %s [--config LEGACY_FILE] [--verbose] [COMMAND ...]\n"
         "       %s --generate-psk FILE\n"
         "\n"
         "Without COMMAND, ipsec_app starts an interactive CLI session.\n"
         "The application connects to charon before accepting commands.\n"
         "--generate-psk creates a new 48-byte hex PSK file without\n"
         "connecting to charon and never overwrites an existing file.\n",
-        pcProgram, pcProgram);
+        pcProgram, pcProgram, pcProgram);
 }
 
 static void PrintNativeAppHelp(void)
 {
     (void)printf(
         "Commands:\n"
-        "  config load FILE             load a v15 configuration\n"
+        "  config load FILE             load a legacy combined configuration\n"
         "  config set KEY VALUE         update one in-memory setting\n"
         "  config validate              validate and rebuild settings\n"
         "  connection load              load the configured connection\n"
@@ -115,6 +123,10 @@ static void PrintNativeAppHelp(void)
         "  child terminate [NAME]       terminate a CHILD SA\n"
         "  child rekey [NAME]           rekey a CHILD SA\n"
         "  child wait [NAME]            wait for an installed CHILD SA\n"
+        "  peer listen                  initiator accepts one responder\n"
+        "  peer register                responder registers with initiator\n"
+        "  peer show                    show the in-memory peer table\n"
+        "  peer select PEER_ID          select a peer for control commands\n"
         "  show [SCOPE]                 show a compact table (summary default)\n"
         "  show {connections|ike|child} detail [NAME]\n"
         "                               show every field, optionally by name\n"
@@ -165,6 +177,26 @@ static bool ParseNativeAppStartupOptions(
             if ((iIndex + 1) < iArgumentCount) {
                 iIndex++;
                 pOptions->pcConfigPath = ppcArguments[iIndex];
+                iIndex++;
+            }
+            else {
+                bParsed = false;
+            }
+        }
+        else if (0 == strcmp("--app-config", pcArgument)) {
+            if ((iIndex + 1) < iArgumentCount) {
+                iIndex++;
+                pOptions->pcApplicationConfigPath = ppcArguments[iIndex];
+                iIndex++;
+            }
+            else {
+                bParsed = false;
+            }
+        }
+        else if (0 == strcmp("--management-config", pcArgument)) {
+            if ((iIndex + 1) < iArgumentCount) {
+                iIndex++;
+                pOptions->pcManagementConfigPath = ppcArguments[iIndex];
                 iIndex++;
             }
             else {
@@ -312,7 +344,9 @@ static void ShowNativeAppConfig(const NativeAppSession_t *pSession)
 
     (void)printf(
         "[CONFIGURATION]\n"
-        "  Path             : %s\n"
+        "  Legacy Path      : %s\n"
+        "  Application Path : %s\n"
+        "  Management Path  : %s\n"
         "  Valid            : %s\n"
         "  Role             : %s\n"
         "  Local Address    : %s\n"
@@ -324,6 +358,8 @@ static void ShowNativeAppConfig(const NativeAppSession_t *pSession)
         "  VICI URI         : unix://%s\n"
         "  Connection Name  : %s\n"
         "  CHILD Name       : %s\n"
+        "  Credential ID    : %s\n"
+        "  Peer Server      : %s:%" PRIu32 "\n"
         "  IKE Proposals    : %s\n"
         "  ESP Proposals    : %s\n"
         "  IPsec Mode       : %s\n"
@@ -331,12 +367,18 @@ static void ShowNativeAppConfig(const NativeAppSession_t *pSession)
         "  Terminate On Exit: %s\n"
         "  Command Timeout  : %" PRIu32 " ms\n",
         ('\0' != pSession->acConfigPath[0]) ? pSession->acConfigPath :
-            "<memory>",
+            "<none>",
+        ('\0' != pSession->acApplicationConfigPath[0]) ?
+            pSession->acApplicationConfigPath : "<none>",
+        ('\0' != pSession->acManagementConfigPath[0]) ?
+            pSession->acManagementConfigPath : "<none>",
         pSession->bConfigValid ? "yes" : "no",
         GetNativeAppRoleText(pConfig->eRole), pConfig->acLocalAddress,
         pConfig->acRemoteAddress, pConfig->acLocalId, pConfig->acRemoteId,
         pConfig->acPskFile, pConfig->acOutputRoot, pConfig->acViciSocket,
         pConfig->acConnectionName, pConfig->acChildName,
+        pConfig->acCredentialId, pConfig->acPeerServerAddress,
+        pConfig->uiPeerPort,
         pConfig->acIkeProposals, pConfig->acEspProposals,
         GetNativeAppModeText(pConfig->eMode),
         pConfig->bChildlessIke ? "true" : "false",
@@ -350,6 +392,180 @@ static void ShowNativeAppCredential(const NativeAppSession_t *pSession)
                  "  Session Loaded   : %s\n"
                  "  Secret Displayed : no\n",
                  pSession->bCredentialLoaded ? "yes" : "no");
+}
+
+static const char *GetNativeAppPeerId(const NativeAppPeer_t *pPeer)
+{
+    return (NATIVE_APP_ROLE_RESPONDER == pPeer->Config.eRole) ?
+        pPeer->Config.acLocalId : pPeer->Config.acRemoteId;
+}
+
+static void SaveNativeAppSelectedPeer(NativeAppSession_t *pSession)
+{
+    if (pSession->PeerTable.uiSelectedIndex <
+        pSession->PeerTable.uiCount) {
+        NativeAppPeer_t *pPeer =
+            &pSession->PeerTable.aPeers[
+                pSession->PeerTable.uiSelectedIndex];
+
+        pPeer->Config = pSession->Config;
+        pPeer->bConnectionLoaded = pSession->bConnectionLoaded;
+        pPeer->bCredentialLoaded = pSession->bCredentialLoaded;
+    }
+    else {
+        /* No registered peer is currently selected. */
+    }
+}
+
+static IpsecError_t SelectNativeAppPeer(
+    NativeAppSession_t *pSession,
+    NativeAppPeer_t *pPeer)
+{
+    uint32_t uiIndex;
+    bool bFound = false;
+    IpsecError_t eError;
+
+    if (NULL == pPeer) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    else {
+        for (uiIndex = 0U;
+             uiIndex < pSession->PeerTable.uiCount;
+             uiIndex++) {
+            if (pPeer == &pSession->PeerTable.aPeers[uiIndex]) {
+                bFound = true;
+                break;
+            }
+            else {
+                /* Check the next table entry. */
+            }
+        }
+    }
+    if (!bFound) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    else {
+        SaveNativeAppSelectedPeer(pSession);
+        pSession->PeerTable.uiSelectedIndex = uiIndex;
+        pSession->Config = pPeer->Config;
+        pSession->bConnectionLoaded = pPeer->bConnectionLoaded;
+        pSession->bCredentialLoaded = pPeer->bCredentialLoaded;
+        pSession->bConfigValid = false;
+        eError = RebuildNativeAppRuntime(pSession);
+    }
+    return eError;
+}
+
+static void ShowNativeAppPeers(const NativeAppSession_t *pSession)
+{
+    uint32_t uiIndex;
+
+    (void)printf(
+        "[PEERS]\n"
+        "  Count: %" PRIu32 "\n"
+        "\n"
+        "  Sel  Peer ID                    Group       Logon"
+        "       Remote Address                           Connection\n"
+        "  ---  -------------------------  ----------  ----------"
+        "  ---------------------------------------"
+        "  -------------------------------\n",
+        pSession->PeerTable.uiCount);
+    for (uiIndex = 0U; uiIndex < pSession->PeerTable.uiCount; uiIndex++) {
+        const NativeAppPeer_t *pPeer =
+            &pSession->PeerTable.aPeers[uiIndex];
+
+        (void)printf(
+            "  %-3s  %-25.25s  %-10" PRIu32 "  %-10" PRIu32
+            "  %-39.39s  %-31.31s\n",
+            (uiIndex == pSession->PeerTable.uiSelectedIndex) ? "*" : "",
+            GetNativeAppPeerId(pPeer), pPeer->uiGroupId, pPeer->uiLogonId,
+            pPeer->Config.acRemoteAddress,
+            pPeer->Config.acConnectionName);
+    }
+    if (0U == pSession->PeerTable.uiCount) {
+        (void)printf("  No registered peers.\n");
+    }
+    else {
+        /* All peer rows were printed. */
+    }
+}
+
+static IpsecError_t ExecuteNativeAppPeerCommand(
+    NativeAppSession_t *pSession,
+    uint32_t uiArgumentCount,
+    char **ppcArguments)
+{
+    NativeAppPeer_t *pPeer = NULL;
+    char acError[NATIVE_APP_ERROR_TEXT_LENGTH] = {0};
+    IpsecError_t eError;
+
+    if ((2U == uiArgumentCount) &&
+        (0 == strcmp("show", ppcArguments[1]))) {
+        SaveNativeAppSelectedPeer(pSession);
+        ShowNativeAppPeers(pSession);
+        return IPSEC_OK;
+    }
+    else if ((3U == uiArgumentCount) &&
+             (0 == strcmp("select", ppcArguments[1]))) {
+        pPeer = FindNativeAppPeer(&pSession->PeerTable, ppcArguments[2]);
+        if (NULL == pPeer) {
+            return IPSEC_ERR_CONNECTION_NOT_FOUND;
+        }
+        else {
+            eError = SelectNativeAppPeer(pSession, pPeer);
+        }
+    }
+    else if ((2U == uiArgumentCount) &&
+             (0 == strcmp("listen", ppcArguments[1]))) {
+        if (NATIVE_APP_ROLE_INITIATOR != pSession->BaseConfig.eRole) {
+            return IPSEC_ERR_NOT_SUPPORTED;
+        }
+        else {
+            (void)printf("waiting for one responder on %s:%" PRIu32 "...\n",
+                         pSession->BaseConfig.acPeerServerAddress,
+                         pSession->BaseConfig.uiPeerPort);
+            eError = AcceptNativeAppPeer(
+                &pSession->BaseConfig, &pSession->PeerTable, &pPeer,
+                acError, sizeof(acError));
+        }
+        if (IPSEC_OK == eError) {
+            eError = SelectNativeAppPeer(pSession, pPeer);
+        }
+    }
+    else if ((2U == uiArgumentCount) &&
+             (0 == strcmp("register", ppcArguments[1]))) {
+        if (NATIVE_APP_ROLE_RESPONDER != pSession->BaseConfig.eRole) {
+            return IPSEC_ERR_NOT_SUPPORTED;
+        }
+        else {
+            (void)printf("registering with initiator %s:%" PRIu32 "...\n",
+                         pSession->BaseConfig.acPeerServerAddress,
+                         pSession->BaseConfig.uiPeerPort);
+            eError = RegisterNativeAppPeer(
+                &pSession->BaseConfig, &pSession->PeerTable, &pPeer,
+                acError, sizeof(acError));
+        }
+        if (IPSEC_OK == eError) {
+            eError = SelectNativeAppPeer(pSession, pPeer);
+        }
+    }
+    else {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    if (IPSEC_OK == eError) {
+        (void)printf(
+            "peer selected: %s group_id=%" PRIu32
+            " logon_id=%" PRIu32 "\n",
+            GetNativeAppPeerId(pPeer), pPeer->uiGroupId,
+            pPeer->uiLogonId);
+    }
+    else if ('\0' != acError[0]) {
+        (void)fprintf(stderr, "peer operation failed: %s\n", acError);
+    }
+    else {
+        /* The structured error is reported by the command loop. */
+    }
+    return eError;
 }
 
 static IpsecError_t LoadNativeAppSessionConfig(
@@ -408,6 +624,9 @@ static IpsecError_t LoadNativeAppSessionConfig(
             /* Reuse the existing VICI context. */
         }
         pSession->Config = Config;
+        pSession->BaseConfig = Config;
+        pSession->acApplicationConfigPath[0] = '\0';
+        pSession->acManagementConfigPath[0] = '\0';
         pSession->bCredentialLoaded = false;
         pSession->bConfigValid = false;
         eError = RebuildNativeAppRuntime(pSession);
@@ -456,6 +675,13 @@ static IpsecError_t SetNativeAppSessionConfig(
     }
     if (IPSEC_OK == eError) {
         pSession->Config = Config;
+        if (pSession->PeerTable.uiSelectedIndex >=
+            pSession->PeerTable.uiCount) {
+            pSession->BaseConfig = Config;
+        }
+        else {
+            /* This change applies only to the selected peer profile. */
+        }
         pSession->acConfigPath[0] = '\0';
         pSession->bCredentialLoaded = false;
         pSession->bConfigValid = false;
@@ -560,7 +786,15 @@ static IpsecError_t ExecuteNativeAppCredentialCommand(
              (0 == strcmp("clear", ppcArguments[1]))) {
         eError = ClearIpsecCredentials(pSession->pContext);
         if (IPSEC_OK == eError) {
+            uint32_t uiIndex;
+
             pSession->bCredentialLoaded = false;
+            for (uiIndex = 0U;
+                 uiIndex < pSession->PeerTable.uiCount;
+                 uiIndex++) {
+                pSession->PeerTable.aPeers[
+                    uiIndex].bCredentialLoaded = false;
+            }
             (void)printf("all VICI credentials cleared\n");
         }
     }
@@ -1116,6 +1350,10 @@ static IpsecError_t ExecuteNativeAppCommand(
         eError = ExecuteNativeAppCredentialCommand(pSession, uiArgumentCount,
                                                    ppcArguments);
     }
+    else if (0 == strcmp("peer", ppcArguments[0])) {
+        eError = ExecuteNativeAppPeerCommand(pSession, uiArgumentCount,
+                                             ppcArguments);
+    }
     else if (0 == strcmp("ike", ppcArguments[0])) {
         eError = ExecuteNativeAppIkeCommand(pSession, uiArgumentCount,
                                             ppcArguments);
@@ -1223,6 +1461,7 @@ static IpsecError_t ExecuteNativeAppCommand(
     else {
         eError = IPSEC_ERR_INVALID_ARGUMENT;
     }
+    SaveNativeAppSelectedPeer(pSession);
     return eError;
 }
 
@@ -1300,6 +1539,8 @@ int32_t RunNativeAppCli(
     }
     else if (NULL != Options.pcGeneratePskPath) {
         if ((NULL != Options.pcConfigPath) ||
+            (NULL != Options.pcApplicationConfigPath) ||
+            (NULL != Options.pcManagementConfigPath) ||
             (Options.iCommandIndex < iArgumentCount)) {
             PrintNativeAppUsage(ppcArguments[0]);
             return 2;
@@ -1320,12 +1561,51 @@ int32_t RunNativeAppCli(
         }
     }
     else {
+        bool bHasApplicationConfig =
+            (NULL != Options.pcApplicationConfigPath);
+        bool bHasManagementConfig =
+            (NULL != Options.pcManagementConfigPath);
+
+        if ((bHasApplicationConfig != bHasManagementConfig) ||
+            ((NULL != Options.pcConfigPath) && bHasApplicationConfig)) {
+            PrintNativeAppUsage(ppcArguments[0]);
+            return 2;
+        }
+        else {
+            /* The selected configuration mode is complete. */
+        }
         (void)memset(&Session, 0, sizeof(Session));
         Session.bVerbose = Options.bVerbose;
         InitializeNativeAppConfig(&Session.Config);
+        InitializeNativeAppConfig(&Session.BaseConfig);
+        InitializeNativeAppPeerTable(&Session.PeerTable);
     }
 
-    if (NULL != Options.pcConfigPath) {
+    if (NULL != Options.pcApplicationConfigPath) {
+        eError = LoadNativeAppConfigFiles(
+            Options.pcApplicationConfigPath,
+            Options.pcManagementConfigPath, &Session.Config,
+            acError, sizeof(acError));
+        if ((IPSEC_OK == eError) &&
+            CopyNativeAppSessionText(
+                Session.acApplicationConfigPath,
+                sizeof(Session.acApplicationConfigPath),
+                Options.pcApplicationConfigPath) &&
+            CopyNativeAppSessionText(
+                Session.acManagementConfigPath,
+                sizeof(Session.acManagementConfigPath),
+                Options.pcManagementConfigPath)) {
+            Session.BaseConfig = Session.Config;
+            Session.bConfigValid = false;
+        }
+        else if (IPSEC_OK == eError) {
+            eError = IPSEC_ERR_BUFFER_TOO_SMALL;
+        }
+        else {
+            /* Report the split configuration error below. */
+        }
+    }
+    else if (NULL != Options.pcConfigPath) {
         eError = LoadNativeAppConfig(Options.pcConfigPath, &Session.Config,
                                      acError, sizeof(acError));
         if (IPSEC_OK == eError) {
@@ -1337,6 +1617,7 @@ int32_t RunNativeAppCli(
             CopyNativeAppSessionText(Session.acConfigPath,
                                      sizeof(Session.acConfigPath),
                                      Options.pcConfigPath)) {
+            Session.BaseConfig = Session.Config;
             Session.bConfigValid = true;
         }
         else if (IPSEC_OK == eError) {

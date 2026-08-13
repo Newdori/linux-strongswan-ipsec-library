@@ -19,6 +19,13 @@
 #define NATIVE_APP_ALGORITHM_RESULT_LENGTH  128U
 #define NATIVE_APP_ALGORITHM_DEFAULT_PORT  39001U
 #define NATIVE_APP_ALGORITHM_DEFAULT_LIMIT   10U
+#define NATIVE_APP_PEER_DEFAULT_PORT        39002U
+#define NATIVE_APP_PEER_CAPACITY               64U
+#define NATIVE_APP_PEER_MESSAGE_LENGTH        4096U
+#define NATIVE_APP_PEER_ID_PREFIX           "rcst-"
+#define NATIVE_APP_CONNECTION_PREFIX        "conn-"
+#define NATIVE_APP_CHILD_PREFIX             "child-"
+#define NATIVE_APP_CREDENTIAL_PREFIX        "psk-"
 
 typedef enum NativeAppRole {
     NATIVE_APP_ROLE_INITIATOR = 0,
@@ -36,13 +43,30 @@ typedef struct NativeAppConfig {
     char acViciSocket[NATIVE_APP_PATH_LENGTH];
     char acConnectionName[IPSEC_NAME_LENGTH];
     char acChildName[IPSEC_NAME_LENGTH];
+    char acCredentialId[IPSEC_NAME_LENGTH];
+    char acPeerServerAddress[IPSEC_ADDRESS_LENGTH];
     char acIkeProposals[NATIVE_APP_PROPOSAL_TEXT_LENGTH];
     char acEspProposals[NATIVE_APP_PROPOSAL_TEXT_LENGTH];
     IpsecMode_t eMode;
     bool bChildlessIke;
     bool bTerminateOnExit;
     uint32_t uiTimeoutMs;
+    uint32_t uiPeerPort;
 } NativeAppConfig_t;
+
+typedef struct NativeAppPeer {
+    uint32_t uiGroupId;
+    uint32_t uiLogonId;
+    NativeAppConfig_t Config;
+    bool bConnectionLoaded;
+    bool bCredentialLoaded;
+} NativeAppPeer_t;
+
+typedef struct NativeAppPeerTable {
+    NativeAppPeer_t aPeers[NATIVE_APP_PEER_CAPACITY];
+    uint32_t uiCount;
+    uint32_t uiSelectedIndex;
+} NativeAppPeerTable_t;
 
 typedef struct NativeAppRuntimeConfig {
     IpsecConnectionConfig_t Connection;
@@ -201,6 +225,18 @@ IpsecError_t LoadNativeAppConfig(
     char *pcError,
     uint32_t uiErrorLength);
 
+IpsecError_t LoadNativeAppConfigFiles(
+    const char *pcApplicationPath,
+    const char *pcManagementPath,
+    NativeAppConfig_t *pConfig,
+    char *pcError,
+    uint32_t uiErrorLength);
+
+IpsecError_t ValidateNativeAppBaseConfig(
+    const NativeAppConfig_t *pConfig,
+    char *pcError,
+    uint32_t uiErrorLength);
+
 IpsecError_t BuildNativeAppRuntimeConfig(
     const NativeAppConfig_t *pConfig,
     NativeAppRuntimeConfig_t *pRuntime,
@@ -266,6 +302,26 @@ IpsecError_t RunNativeAppAlgorithmServer(
     IpsecContext_t *pContext,
     const NativeAppConfig_t *pConfig,
     uint32_t uiPort);
+
+void InitializeNativeAppPeerTable(NativeAppPeerTable_t *pTable);
+
+IpsecError_t AcceptNativeAppPeer(
+    const NativeAppConfig_t *pBaseConfig,
+    NativeAppPeerTable_t *pTable,
+    NativeAppPeer_t **ppPeer,
+    char *pcError,
+    uint32_t uiErrorLength);
+
+IpsecError_t RegisterNativeAppPeer(
+    const NativeAppConfig_t *pBaseConfig,
+    NativeAppPeerTable_t *pTable,
+    NativeAppPeer_t **ppPeer,
+    char *pcError,
+    uint32_t uiErrorLength);
+
+NativeAppPeer_t *FindNativeAppPeer(
+    NativeAppPeerTable_t *pTable,
+    const char *pcPeerId);
 
 IpsecError_t ShowNativeAppInformation(
     IpsecContext_t *pContext,

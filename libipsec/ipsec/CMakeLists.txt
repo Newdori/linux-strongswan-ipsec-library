@@ -96,6 +96,7 @@ if(IPSEC_NATIVE_BUILD_APPLICATION)
         ../app/command.c
         ../app/config.c
         ../app/lifecycle.c
+        ../app/peer.c
         ../app/show.c
         ../app/main.c)
     set_target_properties(ipsec_app PROPERTIES
@@ -158,7 +159,9 @@ if(BUILD_TESTING)
     target_include_directories(test_app_config PRIVATE
         ../include ../app)
     add_test(NAME app_config COMMAND test_app_config
-        ${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/v15_endpoint.conf)
+        ${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/v15_endpoint.conf
+        ${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/application_initiator.conf
+        ${CMAKE_CURRENT_SOURCE_DIR}/../tests/fixtures/management.conf)
 
     add_executable(test_app_command
         ../tests/unit/test_app_command.c
