@@ -4,7 +4,8 @@
 `libipsec.a`. It connects to the configured strongSwan VICI socket once, keeps
 the product configuration in memory, and waits at an `ipsec>` prompt. No
 connection, credential, or SA is changed until the user enters a control
-command.
+command. An initiator does start its peer-registration listener in the
+background; registration only updates the in-memory peer table.
 
 The application never invokes `swanctl`, `ip`, `systemctl`, a shell, or another
 command. Control uses VICI and status uses VICI, Netlink, and `/proc` through
@@ -86,30 +87,28 @@ selects TCP listen or register behavior. The TCP channel never transfers the
 PSK. Generate one PSK file, securely copy it to the other host, and configure
 the local path on each side.
 
-On the initiator:
-
-```text
-ipsec> peer listen
-```
-
-While it is waiting, run this on the responder:
+The initiator starts its TCP peer listener automatically after its
+configuration is loaded. No `peer listen` command is required. Run this on
+each responder while the initiator CLI is active:
 
 ```text
 ipsec> peer register
 ```
 
 The responder sends its configured IPsec endpoint address. The initiator
-checks it against the TCP source address, generates non-persistent
-`uint32_t` group and logon IDs, returns the policy and controller identity,
+checks it against the TCP source address, assigns non-persistent sequential
+group and logon IDs, returns the policy and controller identity,
 and both applications create matching in-memory peer profiles. Use `peer
 show` to inspect the table and `peer select rcst-GROUP_ID-LOGON_ID` to switch
 the profile used by the existing connection, credential, IKE, CHILD, `up`,
 and `down` commands.
 
-The listener accepts one responder per `peer listen` command so that control
-remains explicit in the interactive CLI. Run it again for each additional
-responder. The table and assigned IDs are deliberately not saved to a file;
-they are recreated after an application restart or re-registration.
+The listener remains active in the background and accepts additional
+responders without blocking the CLI. IDs start at `rcst-1-1`; logon IDs run
+from 1 through 100, then the next peer receives `rcst-2-1`. The table and
+assigned IDs are deliberately not saved to a file; they are recreated after
+an application restart or re-registration. The current fixed in-memory table
+holds up to 256 registered peers.
 
 The registration channel is suitable for the isolated application test
 because it carries no PSK, but it is not authenticated. A product deployment
@@ -157,7 +156,6 @@ child terminate [NAME]
 child rekey [NAME]
 child wait [NAME]
 
-peer listen
 peer register
 peer show
 peer select PEER_ID

@@ -662,6 +662,21 @@ IpsecError_t LoadNativeAppConfig(
         /* Preserve the parser result. */
     }
     (void)fclose(pFile);
+    if ((IPSEC_OK == eError) &&
+        (NATIVE_APP_ROLE_INITIATOR == pConfig->eRole) &&
+        ('\0' == pConfig->acPeerServerAddress[0])) {
+        if (!CopyNativeAppText(pConfig->acPeerServerAddress,
+                               sizeof(pConfig->acPeerServerAddress),
+                               pConfig->acLocalAddress)) {
+            eError = IPSEC_ERR_BUFFER_TOO_SMALL;
+        }
+        else {
+            /* The initiator listens on its configured local address. */
+        }
+    }
+    else {
+        /* Preserve the parsed peer server address or parser error. */
+    }
     if (IPSEC_OK == eError) {
         eError = ValidateNativeAppConfig(pConfig, pcError, uiErrorLength);
     }

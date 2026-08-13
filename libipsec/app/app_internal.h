@@ -3,7 +3,9 @@
 
 #include "ipsec.h"
 
+#include <pthread.h>
 #include <stdbool.h>
+#include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -20,7 +22,9 @@
 #define NATIVE_APP_ALGORITHM_DEFAULT_PORT  39001U
 #define NATIVE_APP_ALGORITHM_DEFAULT_LIMIT   10U
 #define NATIVE_APP_PEER_DEFAULT_PORT        39002U
-#define NATIVE_APP_PEER_CAPACITY               64U
+#define NATIVE_APP_PEER_CAPACITY              256U
+#define NATIVE_APP_PEER_LOGON_LIMIT            100U
+#define NATIVE_APP_PEER_LISTENER_POLL_MS       250U
 #define NATIVE_APP_PEER_MESSAGE_LENGTH        4096U
 #define NATIVE_APP_PEER_ID_PREFIX           "rcst-"
 #define NATIVE_APP_CONNECTION_PREFIX        "conn-"
@@ -66,7 +70,25 @@ typedef struct NativeAppPeerTable {
     NativeAppPeer_t aPeers[NATIVE_APP_PEER_CAPACITY];
     uint32_t uiCount;
     uint32_t uiSelectedIndex;
+    pthread_mutex_t Mutex;
 } NativeAppPeerTable_t;
+
+typedef void (*NativeAppPeerEventCallback_t)(
+    IpsecError_t eError,
+    const NativeAppPeer_t *pPeer,
+    const char *pcError,
+    void *pvUserData);
+
+typedef struct NativeAppPeerListener {
+    pthread_t Thread;
+    NativeAppConfig_t Config;
+    NativeAppPeerTable_t *pTable;
+    NativeAppPeerEventCallback_t pCallback;
+    void *pvUserData;
+    int32_t iServerSocket;
+    atomic_bool bStopRequested;
+    bool bRunning;
+} NativeAppPeerListener_t;
 
 typedef struct NativeAppRuntimeConfig {
     IpsecConnectionConfig_t Connection;
@@ -303,7 +325,32 @@ IpsecError_t RunNativeAppAlgorithmServer(
     const NativeAppConfig_t *pConfig,
     uint32_t uiPort);
 
-void InitializeNativeAppPeerTable(NativeAppPeerTable_t *pTable);
+IpsecError_t InitializeNativeAppPeerTable(NativeAppPeerTable_t *pTable);
+
+void DeinitializeNativeAppPeerTable(NativeAppPeerTable_t *pTable);
+
+void LockNativeAppPeerTable(NativeAppPeerTable_t *pTable);
+
+void UnlockNativeAppPeerTable(NativeAppPeerTable_t *pTable);
+
+IpsecError_t GetNativeAppPeerSequence(
+    uint32_t uiOrdinal,
+    uint32_t *puiGroupId,
+    uint32_t *puiLogonId);
+
+IpsecError_t StartNativeAppPeerListener(
+    NativeAppPeerListener_t *pListener,
+    const NativeAppConfig_t *pBaseConfig,
+    NativeAppPeerTable_t *pTable,
+    NativeAppPeerEventCallback_t pCallback,
+    void *pvUserData,
+    char *pcError,
+    uint32_t uiErrorLength);
+
+void StopNativeAppPeerListener(NativeAppPeerListener_t *pListener);
+
+bool IsNativeAppPeerListenerRunning(
+    const NativeAppPeerListener_t *pListener);
 
 IpsecError_t AcceptNativeAppPeer(
     const NativeAppConfig_t *pBaseConfig,

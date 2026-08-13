@@ -178,6 +178,24 @@ if(BUILD_TESTING)
         ../include ../app)
     add_test(NAME app_command COMMAND test_app_command)
 
+    add_executable(test_app_peer_sequence
+        ../tests/unit/test_app_peer_sequence.c
+        ../app/peer.c
+        ../app/command.c)
+    set_target_properties(test_app_peer_sequence PROPERTIES
+        C_STANDARD 11
+        C_STANDARD_REQUIRED YES
+        C_EXTENSIONS NO)
+    target_compile_definitions(test_app_peer_sequence PRIVATE
+        _POSIX_C_SOURCE=200809L)
+    target_compile_options(test_app_peer_sequence PRIVATE
+        -Wall -Wextra -Wpedantic -Werror)
+    target_include_directories(test_app_peer_sequence PRIVATE
+        ../include ../app)
+    target_link_libraries(test_app_peer_sequence PRIVATE
+        ipsec_native_static)
+    add_test(NAME app_peer_sequence COMMAND test_app_peer_sequence)
+
     add_executable(test_psk_generate
         ../tests/unit/test_psk_generate.c)
     set_target_properties(test_psk_generate PROPERTIES

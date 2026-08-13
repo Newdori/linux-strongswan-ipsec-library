@@ -285,40 +285,21 @@ static IpsecError_t ReceiveNativeAppPeerMessage(
     return eError;
 }
 
-static IpsecError_t ReadNativeAppPeerRandom(
+IpsecError_t GetNativeAppPeerSequence(
+    uint32_t uiOrdinal,
     uint32_t *puiGroupId,
     uint32_t *puiLogonId)
 {
-    uint32_t auiIds[2] = {0U, 0U};
-    uint8_t *pucData = (uint8_t *)auiIds;
-    size_t zOffset = 0U;
-    int32_t iFile = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
+    uint32_t uiGroupOffset;
 
-    if (0 > iFile) {
-        return IPSEC_ERR_RANDOM;
+    if ((NULL == puiGroupId) || (NULL == puiLogonId)) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
     }
     else {
-        /* Read non-persistent identifiers from the kernel RNG. */
+        uiGroupOffset = uiOrdinal / NATIVE_APP_PEER_LOGON_LIMIT;
+        *puiGroupId = uiGroupOffset + 1U;
+        *puiLogonId = (uiOrdinal % NATIVE_APP_PEER_LOGON_LIMIT) + 1U;
     }
-    while (zOffset < sizeof(auiIds)) {
-        ssize_t zRead = read(iFile, pucData + zOffset,
-                             sizeof(auiIds) - zOffset);
-
-        if ((0 > zRead) && (EINTR == errno)) {
-            continue;
-        }
-        else if (0 >= zRead) {
-            (void)close(iFile);
-            return IPSEC_ERR_RANDOM;
-        }
-        else {
-            zOffset += (size_t)zRead;
-        }
-    }
-    (void)close(iFile);
-    *puiGroupId = (0U == auiIds[0]) ? 1U : auiIds[0];
-    *puiLogonId = (0U == auiIds[1]) ? 1U : auiIds[1];
-    (void)memset(auiIds, 0, sizeof(auiIds));
     return IPSEC_OK;
 }
 
@@ -392,47 +373,23 @@ static IpsecError_t BuildNativeAppPeerConfig(
     }
 }
 
-static bool IsNativeAppPeerIdUsed(
-    const NativeAppPeerTable_t *pTable,
-    uint32_t uiGroupId,
-    uint32_t uiLogonId)
-{
-    uint32_t uiIndex;
-
-    for (uiIndex = 0U; uiIndex < pTable->uiCount; uiIndex++) {
-        if ((uiGroupId == pTable->aPeers[uiIndex].uiGroupId) &&
-            (uiLogonId == pTable->aPeers[uiIndex].uiLogonId)) {
-            return true;
-        }
-        else {
-            /* Check the next active peer. */
-        }
-    }
-    return false;
-}
-
 static IpsecError_t AllocateNativeAppPeerIds(
-    const NativeAppPeerTable_t *pTable,
+    NativeAppPeerTable_t *pTable,
     uint32_t *puiGroupId,
     uint32_t *puiLogonId)
 {
-    uint32_t uiAttempt;
+    IpsecError_t eError;
 
-    for (uiAttempt = 0U; uiAttempt < 64U; uiAttempt++) {
-        IpsecError_t eError = ReadNativeAppPeerRandom(puiGroupId,
-                                                       puiLogonId);
-
-        if (IPSEC_OK != eError) {
-            return eError;
-        }
-        else if (!IsNativeAppPeerIdUsed(pTable, *puiGroupId, *puiLogonId)) {
-            return IPSEC_OK;
-        }
-        else {
-            /* Generate another pair after the unlikely collision. */
-        }
+    LockNativeAppPeerTable(pTable);
+    if (pTable->uiCount >= NATIVE_APP_PEER_CAPACITY) {
+        eError = IPSEC_ERR_BUFFER_TOO_SMALL;
     }
-    return IPSEC_ERR_INTERNAL;
+    else {
+        eError = GetNativeAppPeerSequence(pTable->uiCount, puiGroupId,
+                                          puiLogonId);
+    }
+    UnlockNativeAppPeerTable(pTable);
+    return eError;
 }
 
 static IpsecError_t AppendNativeAppPeer(
@@ -440,15 +397,27 @@ static IpsecError_t AppendNativeAppPeer(
     const NativeAppPeer_t *pPeer,
     NativeAppPeer_t **ppPeer)
 {
+    IpsecError_t eError;
+
+    LockNativeAppPeerTable(pTable);
     if (pTable->uiCount >= NATIVE_APP_PEER_CAPACITY) {
-        return IPSEC_ERR_BUFFER_TOO_SMALL;
+        eError = IPSEC_ERR_BUFFER_TOO_SMALL;
+    }
+    else if ((NATIVE_APP_ROLE_INITIATOR == pPeer->Config.eRole) &&
+             ((pPeer->uiGroupId !=
+               ((pTable->uiCount / NATIVE_APP_PEER_LOGON_LIMIT) + 1U)) ||
+              (pPeer->uiLogonId !=
+               ((pTable->uiCount % NATIVE_APP_PEER_LOGON_LIMIT) + 1U)))) {
+        eError = IPSEC_ERR_INVALID_ARGUMENT;
     }
     else {
         pTable->aPeers[pTable->uiCount] = *pPeer;
         *ppPeer = &pTable->aPeers[pTable->uiCount];
         pTable->uiCount++;
-        return IPSEC_OK;
+        eError = IPSEC_OK;
     }
+    UnlockNativeAppPeerTable(pTable);
+    return eError;
 }
 
 static int32_t OpenNativeAppServerSocket(
@@ -483,7 +452,7 @@ static int32_t OpenNativeAppServerSocket(
         iSocket = -1;
     }
     else {
-        /* The socket is listening for one explicit CLI accept operation. */
+        /* The listener thread reuses this socket for every registration. */
     }
     return iSocket;
 }
@@ -579,14 +548,51 @@ static int32_t OpenNativeAppClientSocket(
     }
 }
 
-void InitializeNativeAppPeerTable(NativeAppPeerTable_t *pTable)
+IpsecError_t InitializeNativeAppPeerTable(NativeAppPeerTable_t *pTable)
 {
-    if (NULL != pTable) {
-        (void)memset(pTable, 0, sizeof(*pTable));
-        pTable->uiSelectedIndex = UINT32_MAX;
+    if (NULL == pTable) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
     }
     else {
-        /* Nothing to initialize. */
+        (void)memset(pTable, 0, sizeof(*pTable));
+    }
+    if (0 != pthread_mutex_init(&pTable->Mutex, NULL)) {
+        return IPSEC_ERR_INTERNAL;
+    }
+    else {
+        pTable->uiSelectedIndex = UINT32_MAX;
+        return IPSEC_OK;
+    }
+}
+
+void DeinitializeNativeAppPeerTable(NativeAppPeerTable_t *pTable)
+{
+    if (NULL != pTable) {
+        (void)pthread_mutex_destroy(&pTable->Mutex);
+        (void)memset(pTable, 0, sizeof(*pTable));
+    }
+    else {
+        /* Nothing to deinitialize. */
+    }
+}
+
+void LockNativeAppPeerTable(NativeAppPeerTable_t *pTable)
+{
+    if (NULL != pTable) {
+        (void)pthread_mutex_lock(&pTable->Mutex);
+    }
+    else {
+        /* Nothing to lock. */
+    }
+}
+
+void UnlockNativeAppPeerTable(NativeAppPeerTable_t *pTable)
+{
+    if (NULL != pTable) {
+        (void)pthread_mutex_unlock(&pTable->Mutex);
+    }
+    else {
+        /* Nothing to unlock. */
     }
 }
 
@@ -595,6 +601,7 @@ NativeAppPeer_t *FindNativeAppPeer(
     const char *pcPeerId)
 {
     uint32_t uiIndex;
+    NativeAppPeer_t *pPeer = NULL;
 
     if ((NULL == pTable) || (NULL == pcPeerId)) {
         return NULL;
@@ -602,6 +609,7 @@ NativeAppPeer_t *FindNativeAppPeer(
     else {
         /* Search the active in-memory table. */
     }
+    LockNativeAppPeerTable(pTable);
     for (uiIndex = 0U; uiIndex < pTable->uiCount; uiIndex++) {
         const char *pcCurrentId = pTable->aPeers[uiIndex].Config.acRemoteId;
 
@@ -613,16 +621,19 @@ NativeAppPeer_t *FindNativeAppPeer(
             /* Initiators identify a peer by its remote IKE identity. */
         }
         if (0 == strcmp(pcPeerId, pcCurrentId)) {
-            return &pTable->aPeers[uiIndex];
+            pPeer = &pTable->aPeers[uiIndex];
+            break;
         }
         else {
             /* Check the next peer. */
         }
     }
-    return NULL;
+    UnlockNativeAppPeerTable(pTable);
+    return pPeer;
 }
 
-IpsecError_t AcceptNativeAppPeer(
+static IpsecError_t AcceptNativeAppPeerConnection(
+    int32_t iServerSocket,
     const NativeAppConfig_t *pBaseConfig,
     NativeAppPeerTable_t *pTable,
     NativeAppPeer_t **ppPeer,
@@ -641,14 +652,13 @@ IpsecError_t AcceptNativeAppPeer(
     char *pcExtra;
     uint32_t uiGroupId = 0U;
     uint32_t uiLogonId = 0U;
-    int32_t iServerSocket;
     int32_t iPeerSocket = -1;
     int32_t iLength;
     IpsecError_t eError;
 
     if ((NULL == pBaseConfig) || (NULL == pTable) || (NULL == ppPeer) ||
+        (0 > iServerSocket) ||
         (NATIVE_APP_ROLE_INITIATOR != pBaseConfig->eRole) ||
-        (pTable->uiCount >= NATIVE_APP_PEER_CAPACITY) ||
         !IsNativeAppPeerToken(pBaseConfig->acLocalId) ||
         !IsNativeAppPeerToken(pBaseConfig->acIkeProposals) ||
         !IsNativeAppPeerToken(pBaseConfig->acEspProposals)) {
@@ -657,31 +667,21 @@ IpsecError_t AcceptNativeAppPeer(
     else {
         *ppPeer = NULL;
     }
-    iServerSocket = OpenNativeAppServerSocket(pBaseConfig, pcError,
-                                               uiErrorLength);
-    if (0 > iServerSocket) {
-        return IPSEC_ERR_INTERNAL;
+    iPeerSocket = (int32_t)accept(
+        iServerSocket, (struct sockaddr *)&RemoteSocketAddress,
+        &uiRemoteLength);
+    if (0 > iPeerSocket) {
+        SetNativeAppPeerError(pcError, uiErrorLength,
+                              "failed to accept peer registration");
+        eError = IPSEC_ERR_INTERNAL;
     }
-    eError = WaitNativeAppSocket(iServerSocket, POLLIN,
-                                 pBaseConfig->uiTimeoutMs, pcError,
-                                 uiErrorLength);
-    if (IPSEC_OK == eError) {
-        iPeerSocket = (int32_t)accept(
-            iServerSocket, (struct sockaddr *)&RemoteSocketAddress,
-            &uiRemoteLength);
-        if (0 > iPeerSocket) {
-            SetNativeAppPeerError(pcError, uiErrorLength,
-                                  "failed to accept peer registration");
-            eError = IPSEC_ERR_INTERNAL;
-        }
-        else if (0 != fcntl(iPeerSocket, F_SETFD, FD_CLOEXEC)) {
-            SetNativeAppPeerError(pcError, uiErrorLength,
-                                  "failed to configure peer registration");
-            eError = IPSEC_ERR_INTERNAL;
-        }
-        else {
-            /* Receive one registration request. */
-        }
+    else if (0 != fcntl(iPeerSocket, F_SETFD, FD_CLOEXEC)) {
+        SetNativeAppPeerError(pcError, uiErrorLength,
+                              "failed to configure peer registration");
+        eError = IPSEC_ERR_INTERNAL;
+    }
+    else {
+        eError = IPSEC_OK;
     }
     if (IPSEC_OK == eError) {
         eError = ReceiveNativeAppPeerMessage(
@@ -754,8 +754,156 @@ IpsecError_t AcceptNativeAppPeer(
     else {
         /* No accepted socket needs closing. */
     }
+    return eError;
+}
+
+IpsecError_t AcceptNativeAppPeer(
+    const NativeAppConfig_t *pBaseConfig,
+    NativeAppPeerTable_t *pTable,
+    NativeAppPeer_t **ppPeer,
+    char *pcError,
+    uint32_t uiErrorLength)
+{
+    int32_t iServerSocket;
+    IpsecError_t eError;
+
+    if ((NULL == pBaseConfig) || (NULL == pTable) || (NULL == ppPeer)) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    else {
+        iServerSocket = OpenNativeAppServerSocket(pBaseConfig, pcError,
+                                                   uiErrorLength);
+    }
+    if (0 > iServerSocket) {
+        return IPSEC_ERR_INTERNAL;
+    }
+    else {
+        eError = WaitNativeAppSocket(iServerSocket, POLLIN,
+                                     pBaseConfig->uiTimeoutMs, pcError,
+                                     uiErrorLength);
+    }
+    if (IPSEC_OK == eError) {
+        eError = AcceptNativeAppPeerConnection(
+            iServerSocket, pBaseConfig, pTable, ppPeer, pcError,
+            uiErrorLength);
+    }
+    else {
+        /* Preserve the listener wait error. */
+    }
     (void)close(iServerSocket);
     return eError;
+}
+
+static void NotifyNativeAppPeerListener(
+    NativeAppPeerListener_t *pListener,
+    IpsecError_t eError,
+    const NativeAppPeer_t *pPeer,
+    const char *pcError)
+{
+    if (NULL != pListener->pCallback) {
+        pListener->pCallback(eError, pPeer, pcError,
+                             pListener->pvUserData);
+    }
+    else {
+        /* No listener event callback was registered. */
+    }
+}
+
+static void *RunNativeAppPeerListener(void *pvArgument)
+{
+    NativeAppPeerListener_t *pListener =
+        (NativeAppPeerListener_t *)pvArgument;
+
+    while (!atomic_load(&pListener->bStopRequested)) {
+        NativeAppPeer_t *pPeer = NULL;
+        char acError[NATIVE_APP_ERROR_TEXT_LENGTH] = {0};
+        IpsecError_t eError = WaitNativeAppSocket(
+            pListener->iServerSocket, POLLIN,
+            NATIVE_APP_PEER_LISTENER_POLL_MS, acError,
+            sizeof(acError));
+
+        if (IPSEC_ERR_VICI_TIMEOUT == eError) {
+            continue;
+        }
+        else if (IPSEC_OK == eError) {
+            eError = AcceptNativeAppPeerConnection(
+                pListener->iServerSocket, &pListener->Config,
+                pListener->pTable, &pPeer, acError, sizeof(acError));
+        }
+        else {
+            NotifyNativeAppPeerListener(pListener, eError, NULL, acError);
+            break;
+        }
+        NotifyNativeAppPeerListener(pListener, eError, pPeer, acError);
+    }
+    (void)close(pListener->iServerSocket);
+    pListener->iServerSocket = -1;
+    return NULL;
+}
+
+IpsecError_t StartNativeAppPeerListener(
+    NativeAppPeerListener_t *pListener,
+    const NativeAppConfig_t *pBaseConfig,
+    NativeAppPeerTable_t *pTable,
+    NativeAppPeerEventCallback_t pCallback,
+    void *pvUserData,
+    char *pcError,
+    uint32_t uiErrorLength)
+{
+    int32_t iResult;
+
+    if ((NULL == pListener) || (NULL == pBaseConfig) || (NULL == pTable) ||
+        (NATIVE_APP_ROLE_INITIATOR != pBaseConfig->eRole) ||
+        pListener->bRunning) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    else {
+        (void)memset(pListener, 0, sizeof(*pListener));
+        pListener->iServerSocket = -1;
+        pListener->Config = *pBaseConfig;
+        pListener->pTable = pTable;
+        pListener->pCallback = pCallback;
+        pListener->pvUserData = pvUserData;
+        atomic_init(&pListener->bStopRequested, false);
+    }
+    pListener->iServerSocket = OpenNativeAppServerSocket(
+        &pListener->Config, pcError, uiErrorLength);
+    if (0 > pListener->iServerSocket) {
+        return IPSEC_ERR_INTERNAL;
+    }
+    else {
+        iResult = pthread_create(&pListener->Thread, NULL,
+                                 RunNativeAppPeerListener, pListener);
+    }
+    if (0 != iResult) {
+        (void)close(pListener->iServerSocket);
+        pListener->iServerSocket = -1;
+        SetNativeAppPeerError(pcError, uiErrorLength,
+                              "failed to start peer listener thread");
+        return IPSEC_ERR_INTERNAL;
+    }
+    else {
+        pListener->bRunning = true;
+        return IPSEC_OK;
+    }
+}
+
+void StopNativeAppPeerListener(NativeAppPeerListener_t *pListener)
+{
+    if ((NULL != pListener) && pListener->bRunning) {
+        atomic_store(&pListener->bStopRequested, true);
+        (void)pthread_join(pListener->Thread, NULL);
+        pListener->bRunning = false;
+    }
+    else {
+        /* The peer listener is already stopped. */
+    }
+}
+
+bool IsNativeAppPeerListenerRunning(
+    const NativeAppPeerListener_t *pListener)
+{
+    return (NULL != pListener) && pListener->bRunning;
 }
 
 IpsecError_t RegisterNativeAppPeer(
@@ -821,6 +969,7 @@ IpsecError_t RegisterNativeAppPeer(
             !ParseNativeAppNumber(pacTokens[2], &uiGroupId) ||
             !ParseNativeAppNumber(pacTokens[3], &uiLogonId) ||
             (0U == uiGroupId) || (0U == uiLogonId) ||
+            (NATIVE_APP_PEER_LOGON_LIMIT < uiLogonId) ||
             !IsNativeAppPeerAddress(pacTokens[4]) ||
             !IsNativeAppPeerToken(pacTokens[5]) ||
             !IsNativeAppPeerToken(pacTokens[6]) ||

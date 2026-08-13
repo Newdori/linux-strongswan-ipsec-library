@@ -54,6 +54,8 @@ int main(int iArgumentCount, char **ppcArguments)
                   (60000U != Config.uiTimeoutMs) ||
                   (0 != strcmp("./results", Config.acOutputRoot)) ||
                   (0 != strcmp("/run/charon.vici", Config.acViciSocket)) ||
+                  (0 != strcmp("192.0.2.10",
+                               Config.acPeerServerAddress)) ||
                   (0 != strcmp("192.0.2.10/32",
                                Runtime.acLocalTrafficSelector)) ||
                   (0 != strcmp("192.0.2.20/32",
