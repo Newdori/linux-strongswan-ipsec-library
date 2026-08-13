@@ -123,6 +123,10 @@ typedef struct NativeAppAlgorithmCaseResult {
     char acNegotiatedIke[IPSEC_PROPOSAL_LENGTH];
     char acNegotiatedEsp[IPSEC_PROPOSAL_LENGTH];
     char acPeerResult[NATIVE_APP_ALGORITHM_RESULT_LENGTH];
+    bool bIkeVerified;
+    bool bEspVerified;
+    bool bXfrmVerified;
+    bool bDataPathVerified;
 } NativeAppAlgorithmCaseResult_t;
 
 typedef struct NativeAppAlgorithmOptions {

@@ -387,7 +387,8 @@ IpsecError_t WriteNativeAppAlgorithmRunReport(
             (void)fputs(
                 "number,case_id,role,ike_proposal,esp_proposal,"
                 "negotiated_ike,negotiated_esp,reqid,xfrm_states,"
-                "xfrm_policies,duration_ms,peer_result,result,error,cleanup\n",
+                "xfrm_policies,ike_result,esp_result,xfrm_result,"
+                "data_path_result,duration_ms,peer_result,result,error,cleanup\n",
                 pFile);
             (void)fclose(pFile);
         }
@@ -722,6 +723,8 @@ IpsecError_t FinishNativeAppAlgorithmCaseReport(
             "\nxfrm_states_active=%" PRIu32
             "\nxfrm_policies_active=%" PRIu32
             "\npeer_result=%s\nduration_ms=%" PRIu64
+            "\nike_result=%s\nesp_result=%s\nxfrm_result=%s\n"
+            "data_path_result=%s\n"
             "\nresult=%s\nerror=%s\ncleanup=%s\n"
             "connection_remaining=%" PRIu32 "\nike_remaining=%" PRIu32
             "\nchild_remaining=%" PRIu32
@@ -734,6 +737,10 @@ IpsecError_t FinishNativeAppAlgorithmCaseReport(
             pResult->uiXfrmStateCount, pResult->uiXfrmPolicyCount,
             ('\0' == pResult->acPeerResult[0]) ? "N/A" :
             pResult->acPeerResult, pResult->ullDurationMs,
+            pResult->bIkeVerified ? "PASS" : "FAIL",
+            pResult->bEspVerified ? "PASS" : "FAIL",
+            pResult->bXfrmVerified ? "PASS" : "FAIL",
+            pResult->bDataPathVerified ? "PASS" : "FAIL",
             GetNativeAppAlgorithmResultName(pResult->eResult),
             GetIpsecErrorString(pResult->eError),
             GetIpsecErrorString(eCleanup), uiConnections, uiIkes,
@@ -742,16 +749,69 @@ IpsecError_t FinishNativeAppAlgorithmCaseReport(
             "PASS" : "FAIL");
         (void)fclose(pFile);
     }
+    pFile = OpenReportFile(pcCaseDirectory, "ike_result.txt", "w");
+    if (NULL != pFile) {
+        (void)fprintf(pFile,
+            "case_id=%s\nrole=%s\nrequested_proposal=%s\n"
+            "established=%s\nnegotiated_proposal=%s\nresult=%s\n",
+            pResult->Case.acId, pcRole, pResult->Case.acIkeProposal,
+            pResult->bIkeVerified ? "yes" : "no",
+            ('\0' == pResult->acNegotiatedIke[0]) ? "N/A" :
+            pResult->acNegotiatedIke,
+            pResult->bIkeVerified ? "PASS" : "FAIL");
+        (void)fclose(pFile);
+    }
+    pFile = OpenReportFile(pcCaseDirectory, "esp_result.txt", "w");
+    if (NULL != pFile) {
+        bool bEspOverall = pResult->bEspVerified &&
+            pResult->bXfrmVerified && pResult->bDataPathVerified;
+
+        (void)fprintf(pFile,
+            "case_id=%s\nrole=%s\nexchange=%s\nrequested_proposal=%s\n"
+            "child_installed=%s\nnegotiated_proposal=%s\n"
+            "separate_child_exchange=%s\nexpected_child_ke=%s\n"
+            "expect_esn=%s\nexpect_no_esn=%s\nreqid=%" PRIu32
+            "\nxfrm_states=%" PRIu32 "\nxfrm_policies=%" PRIu32
+            "\nxfrm_result=%s\ndata_path_result=%s\npeer_result=%s\n"
+            "result=%s\n",
+            pResult->Case.acId, pcRole,
+            pResult->Case.bSeparateChildExchange ?
+            "CREATE_CHILD_SA" : "IKE_AUTH_CHILD_SA",
+            pResult->Case.acEspProposal,
+            pResult->bEspVerified ? "yes" : "no",
+            ('\0' == pResult->acNegotiatedEsp[0]) ? "N/A" :
+            pResult->acNegotiatedEsp,
+            pResult->Case.bSeparateChildExchange ? "yes" : "no",
+            ('\0' == pResult->Case.acExpectedChildKe[0]) ? "N/A" :
+            pResult->Case.acExpectedChildKe,
+            pResult->Case.bExpectEsn ? "yes" : "no",
+            pResult->Case.bExpectNoEsn ? "yes" : "no",
+            pResult->uiReqid, pResult->uiXfrmStateCount,
+            pResult->uiXfrmPolicyCount,
+            pResult->bXfrmVerified ? "PASS" : "FAIL",
+            pResult->bDataPathVerified ? "PASS" : "FAIL",
+            ('\0' == pResult->acPeerResult[0]) ? "N/A" :
+            pResult->acPeerResult, bEspOverall ? "PASS" : "FAIL");
+        (void)fclose(pFile);
+    }
     pFile = OpenReportFile(pcCaseDirectory, "application.log", "a");
     if (NULL != pFile) {
         (void)fprintf(pFile,
             "[INFO] negotiated IKE: %s\n[INFO] negotiated ESP: %s\n"
             "[INFO] reqid=%" PRIu32 " XFRM states=%" PRIu32
-            " policies=%" PRIu32 "\n[%s] result=%s error=%s "
+            " policies=%" PRIu32 "\n[%s] IKE phase=%s\n"
+            "[%s] ESP phase=%s XFRM=%s DATA_PATH=%s\n"
+            "[%s] result=%s error=%s "
             "cleanup=%s duration=%" PRIu64 " ms\n",
             pResult->acNegotiatedIke, pResult->acNegotiatedEsp,
             pResult->uiReqid, pResult->uiXfrmStateCount,
             pResult->uiXfrmPolicyCount,
+            pResult->bIkeVerified ? "PASS" : "FAIL",
+            pResult->bIkeVerified ? "PASS" : "FAIL",
+            pResult->bEspVerified ? "PASS" : "FAIL",
+            pResult->bEspVerified ? "PASS" : "FAIL",
+            pResult->bXfrmVerified ? "PASS" : "FAIL",
+            pResult->bDataPathVerified ? "PASS" : "FAIL",
             (NATIVE_APP_ALGORITHM_RESULT_PASS == pResult->eResult) ?
             "PASS" : "FAIL",
             GetNativeAppAlgorithmResultName(pResult->eResult),
@@ -763,13 +823,19 @@ IpsecError_t FinishNativeAppAlgorithmCaseReport(
     if (NULL != pFile) {
         (void)fprintf(pFile,
             "%" PRIu32 ",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\","
-            "%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu64 ",\"%s\","
+            "%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",\"%s\",\"%s\",\"%s\","
+            "\"%s\",%" PRIu64 ",\"%s\","
             "\"%s\",\"%s\",\"%s\"\n",
             pResult->Case.uiNumber, pResult->Case.acId, pcRole,
             pResult->Case.acIkeProposal, pResult->Case.acEspProposal,
             pResult->acNegotiatedIke, pResult->acNegotiatedEsp,
             pResult->uiReqid, pResult->uiXfrmStateCount,
-            pResult->uiXfrmPolicyCount, pResult->ullDurationMs,
+            pResult->uiXfrmPolicyCount,
+            pResult->bIkeVerified ? "PASS" : "FAIL",
+            pResult->bEspVerified ? "PASS" : "FAIL",
+            pResult->bXfrmVerified ? "PASS" : "FAIL",
+            pResult->bDataPathVerified ? "PASS" : "FAIL",
+            pResult->ullDurationMs,
             ('\0' == pResult->acPeerResult[0]) ? "N/A" :
             pResult->acPeerResult,
             GetNativeAppAlgorithmResultName(pResult->eResult),

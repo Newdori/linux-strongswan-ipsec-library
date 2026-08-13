@@ -664,36 +664,44 @@ static IpsecError_t QueryNativeAppAlgorithmState(
             }
         }
     }
+    if ((IPSEC_OK == eError) && (NULL != pIke)) {
+        eError = CopyNativeAppAlgorithmValue(
+            pResult->acNegotiatedIke, sizeof(pResult->acNegotiatedIke),
+            pIke->acProposal);
+        if ((IPSEC_OK == eError) &&
+            ('\0' != pResult->acNegotiatedIke[0])) {
+            pResult->bIkeVerified = true;
+        }
+        else {
+            /* The IKE object did not provide a usable proposal. */
+        }
+    }
+    if ((IPSEC_OK == eError) && (NULL != pChild)) {
+        pResult->uiReqid = pChild->uiReqid;
+        eError = CopyNativeAppAlgorithmValue(
+            pResult->acNegotiatedEsp, sizeof(pResult->acNegotiatedEsp),
+            pChild->acProposal);
+    }
     if ((IPSEC_OK == eError) && (NULL == pIke)) {
         pResult->eResult = NATIVE_APP_ALGORITHM_RESULT_FAIL_IKE;
         eError = IPSEC_ERR_IKE_FAILED;
+    }
+    else if ((IPSEC_OK == eError) &&
+             ('\0' == pResult->acNegotiatedIke[0])) {
+        pResult->eResult = NATIVE_APP_ALGORITHM_RESULT_FAIL_PROPOSAL;
+        eError = IPSEC_ERR_VICI_PROTOCOL;
     }
     else if ((IPSEC_OK == eError) && (NULL == pChild)) {
         pResult->eResult = NATIVE_APP_ALGORITHM_RESULT_FAIL_CHILD;
         eError = IPSEC_ERR_CHILD_FAILED;
     }
-    else {
-        /* Continue with the negotiated and kernel state. */
-    }
-    if (IPSEC_OK == eError) {
-        pResult->uiReqid = pChild->uiReqid;
-        eError = CopyNativeAppAlgorithmValue(
-            pResult->acNegotiatedIke, sizeof(pResult->acNegotiatedIke),
-            pIke->acProposal);
-        if (IPSEC_OK == eError) {
-            eError = CopyNativeAppAlgorithmValue(
-                pResult->acNegotiatedEsp,
-                sizeof(pResult->acNegotiatedEsp), pChild->acProposal);
-        }
-    }
-    if ((IPSEC_OK == eError) &&
-        (('\0' == pResult->acNegotiatedIke[0]) ||
-         ('\0' == pResult->acNegotiatedEsp[0]))) {
+    else if ((IPSEC_OK == eError) &&
+             ('\0' == pResult->acNegotiatedEsp[0])) {
         pResult->eResult = NATIVE_APP_ALGORITHM_RESULT_FAIL_PROPOSAL;
         eError = IPSEC_ERR_VICI_PROTOCOL;
     }
     else {
-        /* An exact one-of-each configured proposal produced this SA. */
+        /* Continue with the negotiated and kernel state. */
     }
     if ((IPSEC_OK == eError) && pCase->bSeparateChildExchange &&
         (NULL == strstr(pResult->acNegotiatedEsp,
@@ -713,6 +721,13 @@ static IpsecError_t QueryNativeAppAlgorithmState(
     else {
         /* ESN matches the testcase intent. */
     }
+    if ((IPSEC_OK == eError) &&
+        ('\0' != pResult->acNegotiatedEsp[0])) {
+        pResult->bEspVerified = true;
+    }
+    else {
+        /* Preserve the ESP negotiation failure stage. */
+    }
     if (IPSEC_OK == eError) {
         for (uiIndex = 0U; uiIndex < StateList.uiCount; uiIndex++) {
             if (pResult->uiReqid == StateList.pItems[uiIndex].uiReqid) {
@@ -729,6 +744,9 @@ static IpsecError_t QueryNativeAppAlgorithmState(
             (0U == pResult->uiXfrmPolicyCount)) {
             pResult->eResult = NATIVE_APP_ALGORITHM_RESULT_FAIL_XFRM;
             eError = IPSEC_ERR_INTERNAL;
+        }
+        else {
+            pResult->bXfrmVerified = true;
         }
     }
     FreeIpsecXfrmPolicyList(&PolicyList);
@@ -925,6 +943,13 @@ static IpsecError_t AppendNativeAppAlgorithmJson(
     (void)fputs(", \"cleanup_error\": ", pFile);
     WriteNativeAppJsonString(
         pFile, GetIpsecErrorString(pResult->eCleanupError));
+    (void)fprintf(pFile,
+        ", \"ike_result\": \"%s\", \"esp_result\": \"%s\", "
+        "\"xfrm_result\": \"%s\", \"data_path_result\": \"%s\"",
+        pResult->bIkeVerified ? "PASS" : "FAIL",
+        pResult->bEspVerified ? "PASS" : "FAIL",
+        pResult->bXfrmVerified ? "PASS" : "FAIL",
+        pResult->bDataPathVerified ? "PASS" : "FAIL");
     (void)fputs(", \"peer_result\": ", pFile);
     WriteNativeAppJsonString(pFile, pResult->acPeerResult);
     (void)fputc('}', pFile);
@@ -1174,9 +1199,16 @@ static IpsecError_t RunNativeAppAlgorithmCaseClient(
                 NATIVE_APP_ALGORITHM_RESULT_FAIL_IKE;
         }
     }
-    if (IPSEC_OK == eError) {
-        eError = QueryNativeAppAlgorithmState(pContext, &Config, pCase,
-                                              pResult);
+    if (bStartAttempted) {
+        IpsecError_t eState = QueryNativeAppAlgorithmState(
+            pContext, &Config, pCase, pResult);
+
+        if (IPSEC_OK == eError) {
+            eError = eState;
+        }
+        else {
+            /* Keep the control failure while retaining observed SA stages. */
+        }
     }
     if (bStartAttempted) {
         IpsecError_t eReport = CaptureNativeAppAlgorithmCaseReport(
@@ -1200,6 +1232,7 @@ static IpsecError_t RunNativeAppAlgorithmCaseClient(
         }
         else {
             pResult->eResult = NATIVE_APP_ALGORITHM_RESULT_PASS;
+            pResult->bDataPathVerified = true;
         }
     }
     if (bStartAttempted) {
@@ -1373,6 +1406,16 @@ IpsecError_t RunNativeAppAlgorithmClient(
         }
         ReportNativeAppAlgorithm(
             pLog, stdout,
+            (Result.bIkeVerified && Result.bEspVerified &&
+             Result.bXfrmVerified && Result.bDataPathVerified) ?
+            "PASS" : "FAIL",
+            "phases case=%s IKE=%s ESP=%s XFRM=%s DATA_PATH=%s",
+            Result.Case.acId, Result.bIkeVerified ? "PASS" : "FAIL",
+            Result.bEspVerified ? "PASS" : "FAIL",
+            Result.bXfrmVerified ? "PASS" : "FAIL",
+            Result.bDataPathVerified ? "PASS" : "FAIL");
+        ReportNativeAppAlgorithm(
+            pLog, stdout,
             (NATIVE_APP_ALGORITHM_RESULT_PASS == Result.eResult) ?
             "PASS" : "FAIL",
             "result=%s case=%s duration=%" PRIu64 " ms error=%s",
@@ -1509,6 +1552,7 @@ static IpsecError_t RunNativeAppAlgorithmServerCase(
 
             if (IPSEC_OK == eVerify) {
                 Result.eResult = NATIVE_APP_ALGORITHM_RESULT_PASS;
+                Result.bDataPathVerified = true;
             }
             else {
                 /* QueryNativeAppAlgorithmState set the failure stage. */

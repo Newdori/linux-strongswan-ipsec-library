@@ -242,6 +242,8 @@ results/baseline_20260813_143000_1234_initiator/
     case_001_BASE-001/
         application.log
         case_config.txt
+        ike_result.txt
+        esp_result.txt
         sa_snapshot.txt
         xfrm_states_active.txt
         xfrm_policies_active.txt
@@ -264,6 +266,8 @@ results/baseline_20260813_143000_1234_responder/
     case_001_BASE-001/
         application.log
         case_config.txt
+        ike_result.txt
+        esp_result.txt
         sa_snapshot.txt
         xfrm_states_active.txt
         xfrm_policies_active.txt
@@ -280,6 +284,16 @@ network context, and post-cleanup residue counts. PSK contents and XFRM key
 material are never written. Packet capture, PCAP, shell command output, and
 generated strongSwan configuration files remain excluded from the Native
 library test.
+
+Every algorithm case verifies both phases. `ike_result.txt` records IKE_SA
+establishment and the negotiated IKE proposal. `esp_result.txt` records the
+CHILD_SA/ESP proposal, SPI/reqid-related XFRM verification, ESN/PFS intent,
+and the protected peer data-path result. Baseline contains both IKE-varying
+and ESP-varying cases. `exhaustive-ike` varies IKE while retaining the base
+ESP proposal, and `exhaustive-esp` varies ESP encryption, integrity, AEAD,
+PFS, and ESN while retaining the base IKE proposal. PFS cases use a separate
+CREATE_CHILD_SA exchange after IKE establishment; other cases install the
+CHILD_SA during IKE_AUTH, matching the v15 behavior.
 
 `results.json` is checkpointed after every case and remains available after a
 test failure or Ctrl-C. `--results FILE` selects its filename inside the newly
