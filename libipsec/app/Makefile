@@ -37,6 +37,7 @@ APPLICATION = $(OUTPUT_DIR)/ipsec_app
 
 SOURCES = \
 	algorithm_catalog.c \
+	algorithm_report.c \
 	algorithm_runner.c \
 	cli.c \
 	command.c \

@@ -89,6 +89,7 @@ install(FILES
 if(IPSEC_NATIVE_BUILD_APPLICATION)
     add_executable(ipsec_app
         ../app/algorithm_catalog.c
+        ../app/algorithm_report.c
         ../app/algorithm_runner.c
         ../app/cli.c
         ../app/command.c

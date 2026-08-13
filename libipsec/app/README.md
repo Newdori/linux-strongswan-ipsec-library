@@ -227,10 +227,59 @@ use the same timestamp and mode:
 ```text
 results/baseline_20260813_143000_1234_initiator/
     application.log
+    run_context.txt
+    daemon_status_initial.txt
+    daemon_status_final.txt
+    daemon_algorithms.txt
+    network_interfaces.txt
+    network_addresses.txt
+    network_routes.txt
+    xfrm_statistics_initial.txt
+    xfrm_statistics_final.txt
+    final_state.txt
+    matrix_summary.csv
     results.json
+    case_001_BASE-001/
+        application.log
+        case_config.txt
+        sa_snapshot.txt
+        xfrm_states_active.txt
+        xfrm_policies_active.txt
+        xfrm_statistics_active.txt
+        cleanup_state.txt
+        result_summary.txt
 results/baseline_20260813_143000_1234_responder/
     application.log
+    run_context.txt
+    daemon_status_initial.txt
+    daemon_status_final.txt
+    daemon_algorithms.txt
+    network_interfaces.txt
+    network_addresses.txt
+    network_routes.txt
+    xfrm_statistics_initial.txt
+    xfrm_statistics_final.txt
+    final_state.txt
+    matrix_summary.csv
+    case_001_BASE-001/
+        application.log
+        case_config.txt
+        sa_snapshot.txt
+        xfrm_states_active.txt
+        xfrm_policies_active.txt
+        xfrm_statistics_active.txt
+        cleanup_state.txt
+        result_summary.txt
 ```
+
+These files are produced through the library's VICI, NETLINK_XFRM,
+NETLINK_ROUTE, and `/proc/net/xfrm_stat` APIs. They contain requested and
+negotiated proposals, complete IKE/CHILD fields exposed by the public API,
+SPIs, reqid, selectors, counters, XFRM state/policy attributes, daemon and
+network context, and post-cleanup residue counts. PSK contents and XFRM key
+material are never written. Packet capture, PCAP, shell command output, and
+generated strongSwan configuration files remain excluded from the Native
+library test.
 
 `results.json` is checkpointed after every case and remains available after a
 test failure or Ctrl-C. `--results FILE` selects its filename inside the newly

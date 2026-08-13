@@ -4,6 +4,7 @@
 #include "ipsec.h"
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #define NATIVE_APP_PATH_LENGTH             512U
@@ -114,6 +115,7 @@ typedef struct NativeAppAlgorithmCaseResult {
     NativeAppAlgorithmCase_t Case;
     NativeAppAlgorithmResult_t eResult;
     IpsecError_t eError;
+    IpsecError_t eCleanupError;
     uint32_t uiReqid;
     uint32_t uiXfrmStateCount;
     uint32_t uiXfrmPolicyCount;
@@ -134,6 +136,45 @@ typedef struct NativeAppAlgorithmOptions {
     const char *pcCustomEsp;
     bool bContinueOnError;
 } NativeAppAlgorithmOptions_t;
+
+const char *GetNativeAppAlgorithmResultName(
+    NativeAppAlgorithmResult_t eResult);
+
+IpsecError_t WriteNativeAppAlgorithmRunReport(
+    IpsecContext_t *pContext,
+    const NativeAppConfig_t *pConfig,
+    NativeAppAlgorithmMode_t eMode,
+    const char *pcRole,
+    const char *pcResultDirectory,
+    uint32_t uiRequested,
+    bool bFinal);
+
+IpsecError_t CreateNativeAppAlgorithmCaseReport(
+    const NativeAppConfig_t *pConfig,
+    const NativeAppAlgorithmCase_t *pCase,
+    const char *pcRole,
+    const char *pcResultDirectory,
+    uint32_t uiOrdinal,
+    uint32_t uiRequested,
+    char *pcCaseDirectory,
+    size_t zCaseDirectoryLength);
+
+IpsecError_t CaptureNativeAppAlgorithmCaseReport(
+    IpsecContext_t *pContext,
+    const NativeAppConfig_t *pConfig,
+    const NativeAppAlgorithmCaseResult_t *pResult,
+    const char *pcCaseDirectory);
+
+IpsecError_t FinishNativeAppAlgorithmCaseReport(
+    IpsecContext_t *pContext,
+    const NativeAppConfig_t *pConfig,
+    const NativeAppAlgorithmCaseResult_t *pResult,
+    const char *pcRole,
+    const char *pcResultDirectory,
+    const char *pcCaseDirectory,
+    uint32_t uiOrdinal,
+    uint32_t uiRequested,
+    IpsecError_t eCleanup);
 
 void InitializeNativeAppConfig(NativeAppConfig_t *pConfig);
 
