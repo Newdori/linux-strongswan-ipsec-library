@@ -13,6 +13,10 @@
 #define NATIVE_APP_PSK_MAX_LENGTH        65535U
 #define NATIVE_APP_COMMAND_LINE_LENGTH     2048U
 #define NATIVE_APP_COMMAND_ARGUMENT_COUNT    32U
+#define NATIVE_APP_ALGORITHM_CASE_ID_LENGTH  64U
+#define NATIVE_APP_ALGORITHM_RESULT_LENGTH  128U
+#define NATIVE_APP_ALGORITHM_DEFAULT_PORT  39001U
+#define NATIVE_APP_ALGORITHM_DEFAULT_LIMIT   10U
 
 typedef enum NativeAppRole {
     NATIVE_APP_ROLE_INITIATOR = 0,
@@ -71,6 +75,64 @@ typedef struct NativeAppLoopOptions {
     bool bClearCredentials;
 } NativeAppLoopOptions_t;
 
+typedef enum NativeAppAlgorithmMode {
+    NATIVE_APP_ALGORITHM_BASELINE = 0,
+    NATIVE_APP_ALGORITHM_EXHAUSTIVE_IKE,
+    NATIVE_APP_ALGORITHM_EXHAUSTIVE_ESP,
+    NATIVE_APP_ALGORITHM_CUSTOM
+} NativeAppAlgorithmMode_t;
+
+typedef enum NativeAppAlgorithmResult {
+    NATIVE_APP_ALGORITHM_RESULT_PASS = 0,
+    NATIVE_APP_ALGORITHM_RESULT_FAIL_CONFIG,
+    NATIVE_APP_ALGORITHM_RESULT_FAIL_SYNC,
+    NATIVE_APP_ALGORITHM_RESULT_FAIL_IKE,
+    NATIVE_APP_ALGORITHM_RESULT_FAIL_CHILD,
+    NATIVE_APP_ALGORITHM_RESULT_FAIL_PROPOSAL,
+    NATIVE_APP_ALGORITHM_RESULT_FAIL_PFS,
+    NATIVE_APP_ALGORITHM_RESULT_FAIL_ESN,
+    NATIVE_APP_ALGORITHM_RESULT_FAIL_XFRM,
+    NATIVE_APP_ALGORITHM_RESULT_FAIL_DATA_PATH,
+    NATIVE_APP_ALGORITHM_RESULT_FAIL_CLEANUP,
+    NATIVE_APP_ALGORITHM_RESULT_STOPPED
+} NativeAppAlgorithmResult_t;
+
+typedef struct NativeAppAlgorithmCase {
+    uint32_t uiNumber;
+    char acId[NATIVE_APP_ALGORITHM_CASE_ID_LENGTH];
+    char acIkeProposal[IPSEC_PROPOSAL_LENGTH];
+    char acEspProposal[IPSEC_PROPOSAL_LENGTH];
+    char acExpectedChildKe[IPSEC_ALGORITHM_LENGTH];
+    bool bSeparateChildExchange;
+    bool bExpectEsn;
+    bool bExpectNoEsn;
+} NativeAppAlgorithmCase_t;
+
+typedef struct NativeAppAlgorithmCaseResult {
+    NativeAppAlgorithmCase_t Case;
+    NativeAppAlgorithmResult_t eResult;
+    IpsecError_t eError;
+    uint32_t uiReqid;
+    uint32_t uiXfrmStateCount;
+    uint32_t uiXfrmPolicyCount;
+    uint64_t ullDurationMs;
+    char acNegotiatedIke[IPSEC_PROPOSAL_LENGTH];
+    char acNegotiatedEsp[IPSEC_PROPOSAL_LENGTH];
+    char acPeerResult[NATIVE_APP_ALGORITHM_RESULT_LENGTH];
+} NativeAppAlgorithmCaseResult_t;
+
+typedef struct NativeAppAlgorithmOptions {
+    NativeAppAlgorithmMode_t eMode;
+    uint32_t uiStart;
+    uint32_t uiLimit;
+    uint32_t uiPort;
+    uint32_t uiDelayMs;
+    const char *pcResultsPath;
+    const char *pcCustomIke;
+    const char *pcCustomEsp;
+    bool bContinueOnError;
+} NativeAppAlgorithmOptions_t;
+
 void InitializeNativeAppConfig(NativeAppConfig_t *pConfig);
 
 IpsecError_t SetNativeAppConfigSetting(
@@ -127,6 +189,34 @@ IpsecError_t RunNativeAppLoop(
     NativeAppRuntimeConfig_t *pRuntime,
     const NativeAppLoopOptions_t *pOptions);
 
+const char *GetNativeAppAlgorithmModeName(
+    NativeAppAlgorithmMode_t eMode);
+
+bool ParseNativeAppAlgorithmMode(
+    const char *pcText,
+    NativeAppAlgorithmMode_t *pMode);
+
+uint32_t GetNativeAppAlgorithmCaseCount(
+    NativeAppAlgorithmMode_t eMode);
+
+IpsecError_t GetNativeAppAlgorithmCase(
+    NativeAppAlgorithmMode_t eMode,
+    uint32_t uiIndex,
+    const NativeAppConfig_t *pBaseConfig,
+    const char *pcCustomIke,
+    const char *pcCustomEsp,
+    NativeAppAlgorithmCase_t *pCase);
+
+IpsecError_t RunNativeAppAlgorithmClient(
+    IpsecContext_t *pContext,
+    const NativeAppConfig_t *pConfig,
+    const NativeAppAlgorithmOptions_t *pOptions);
+
+IpsecError_t RunNativeAppAlgorithmServer(
+    IpsecContext_t *pContext,
+    const NativeAppConfig_t *pConfig,
+    uint32_t uiPort);
+
 IpsecError_t ShowNativeAppInformation(
     IpsecContext_t *pContext,
     const char *pcScope,
@@ -146,6 +236,13 @@ bool ParseNativeAppCommandLine(
 bool ParseNativeAppNumber(
     const char *pcText,
     uint32_t *puiValue);
+
+bool IsNativeAppStopRequested(void);
+
+IpsecError_t WaitNativeAppRemoved(
+    IpsecContext_t *pContext,
+    const NativeAppConfig_t *pConfig,
+    uint32_t uiReqid);
 
 bool ParseNativeAppShowOptions(
     uint32_t uiArgumentCount,

@@ -97,6 +97,12 @@ show SCOPE [NAME]
 up
 down
 test loop [--count N] [--delay-ms N] [--continue-on-error]
+test algorithm count MODE
+test algorithm check MODE
+test algorithm serve [--port N]
+test algorithm run MODE [--start N] [--limit N|--all]
+    [--port N] [--results FILE] [--delay-ms N] [--stop-on-error]
+    [--ike PROPOSAL --esp PROPOSAL]
 help
 exit
 ```
@@ -164,3 +170,63 @@ VICI state, verifies matching kernel XFRM state and policy, terminates the SA,
 waits for state removal, and unloads the connection. Run it only with a
 dedicated peer and connection name. Add `--clear-credentials` only on a
 dedicated daemon because VICI credential clearing is daemon-wide.
+
+## Algorithm negotiation verification
+
+Algorithm verification is an application test feature and is not part of the
+product library API. It uses Native VICI and XFRM without running v15,
+`swanctl`, or `ip` commands. The built-in catalogs preserve the v15 testcase
+dimensions:
+
+```text
+baseline         54 cases
+exhaustive-ike   18,172 cases
+exhaustive-esp    4,876 cases
+```
+
+Run the responder application first on PC-B with a responder configuration:
+
+```text
+ipsec> test algorithm serve
+```
+
+Then run a small smoke range on PC-A with the matching initiator
+configuration:
+
+```text
+ipsec> test algorithm count baseline
+ipsec> test algorithm check baseline
+ipsec> test algorithm run baseline --limit 3
+```
+
+The applications synchronize over UDP port `39001` by default. The configured
+local/remote addresses must be reachable and the host firewall must permit
+that port. `PREPARE` is exchanged before SA creation; the `VERIFY` request and
+response are exchanged after CHILD installation, so a passing case also
+confirms traffic in both directions across the installed policy. Use the same
+`--port N` value on both peers to override the default.
+
+Each case loads a connection, establishes IKE/CHILD, checks the negotiated
+proposals, checks PFS and ESN when requested, verifies matching XFRM state and
+policy, tests the protected data path, terminates the SA, verifies removal,
+and unloads the connection. PSK credentials are loaded once per test process
+and are not cleared automatically because VICI credential clearing is
+daemon-wide.
+
+The default output file is `results.json`. It is checkpointed after every case
+and remains in the directory where `ipsec_app` was started even after a test
+failure or Ctrl-C. Select another retained file with `--results FILE`:
+
+```text
+ipsec> test algorithm run baseline --all --results baseline-results.json
+ipsec> test algorithm run exhaustive-ike --start 1 --limit 100 --results ike-part-001.json
+ipsec> test algorithm run exhaustive-esp --all --results esp-results.json
+ipsec> test algorithm run custom --ike aes256-sha256-prfsha256-modp2048 --esp aes256-sha256-modp2048-esn
+```
+
+Exhaustive modes intentionally default to ten cases; use `--all` for the full
+catalog or `--start`/`--limit` to split a long run. Tests continue after a
+failed algorithm by default so JSON captures the whole requested range. Add
+`--stop-on-error` for a diagnostic run that should stop at the first failure.
+A new run to the same output path replaces the previous contents, so use
+distinct result names for separate or resumed ranges.

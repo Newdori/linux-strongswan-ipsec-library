@@ -88,6 +88,8 @@ install(FILES
 
 if(IPSEC_NATIVE_BUILD_APPLICATION)
     add_executable(ipsec_app
+        ../app/algorithm_catalog.c
+        ../app/algorithm_runner.c
         ../app/cli.c
         ../app/command.c
         ../app/config.c
@@ -108,6 +110,21 @@ if(IPSEC_NATIVE_BUILD_APPLICATION)
 endif()
 
 if(BUILD_TESTING)
+    add_executable(test_app_algorithm_catalog
+        ../tests/unit/test_app_algorithm_catalog.c
+        ../app/algorithm_catalog.c)
+    set_target_properties(test_app_algorithm_catalog PROPERTIES
+        C_STANDARD 11
+        C_STANDARD_REQUIRED YES
+        C_EXTENSIONS NO)
+    target_compile_definitions(test_app_algorithm_catalog PRIVATE
+        _POSIX_C_SOURCE=200809L)
+    target_compile_options(test_app_algorithm_catalog PRIVATE
+        -Wall -Wextra -Wpedantic -Werror)
+    target_include_directories(test_app_algorithm_catalog PRIVATE
+        ../include ../app)
+    add_test(NAME app_algorithm_catalog COMMAND test_app_algorithm_catalog)
+
     add_executable(test_app_loop
         ../tests/unit/test_app_loop.c
         ../app/lifecycle.c)

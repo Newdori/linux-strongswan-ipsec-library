@@ -19,6 +19,11 @@ void ResetNativeAppStopRequest(void)
     gbNativeAppStopRequested = 0;
 }
 
+bool IsNativeAppStopRequested(void)
+{
+    return (0 != gbNativeAppStopRequested);
+}
+
 static void SleepNativeApp(uint32_t uiMilliseconds)
 {
     struct timespec Time;
@@ -290,7 +295,7 @@ static IpsecError_t VerifyNativeAppInstalled(
     return eError;
 }
 
-static IpsecError_t WaitNativeAppRemoved(
+IpsecError_t WaitNativeAppRemoved(
     IpsecContext_t *pContext,
     const NativeAppConfig_t *pConfig,
     uint32_t uiReqid)

@@ -119,6 +119,14 @@ static void PrintNativeAppHelp(void)
         "  down                         convenience terminate and unload\n"
         "  test loop [--count N] [--delay-ms N] [--continue-on-error]\n"
         "                               run explicit lifecycle verification\n"
+        "  test algorithm count MODE   show algorithm testcase count\n"
+        "  test algorithm check MODE   validate the generated catalog\n"
+        "  test algorithm serve [--port N]\n"
+        "                               serve Native peer test requests\n"
+        "  test algorithm run MODE [--start N] [--limit N|--all] [--port N]\n"
+        "      [--results FILE] [--delay-ms N] [--stop-on-error]\n"
+        "      [--ike PROPOSAL --esp PROPOSAL]\n"
+        "                               run baseline/exhaustive/custom tests\n"
         "  help                         show this command list\n"
         "  exit                         close only this client session\n"
         "\n"
@@ -128,6 +136,9 @@ static void PrintNativeAppHelp(void)
         "  xfrm, xfrm-state, xfrm-policy, xfrm-stat, network,\n"
         "  interfaces, addresses, routes\n"
         "  NAME filtering is supported for connections, ike, and child.\n"
+        "\n"
+        "Algorithm modes:\n"
+        "  baseline, exhaustive-ike, exhaustive-esp, custom\n"
         "\n"
         "Configuration changes are rejected while this session owns a\n"
         "connection. PSK contents are never displayed.\n");
@@ -798,6 +809,217 @@ static IpsecError_t ExecuteNativeAppLoopCommand(
     return eError;
 }
 
+static IpsecError_t ParseNativeAppAlgorithmRunOptions(
+    uint32_t uiArgumentCount,
+    char **ppcArguments,
+    NativeAppAlgorithmOptions_t *pOptions)
+{
+    uint32_t uiIndex = 4U;
+
+    (void)memset(pOptions, 0, sizeof(*pOptions));
+    if ((4U > uiArgumentCount) ||
+        !ParseNativeAppAlgorithmMode(ppcArguments[3], &pOptions->eMode)) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    pOptions->uiStart = 1U;
+    pOptions->uiPort = NATIVE_APP_ALGORITHM_DEFAULT_PORT;
+    pOptions->uiDelayMs = 500U;
+    pOptions->bContinueOnError = true;
+    pOptions->uiLimit =
+        (NATIVE_APP_ALGORITHM_BASELINE == pOptions->eMode) ?
+        GetNativeAppAlgorithmCaseCount(pOptions->eMode) :
+        NATIVE_APP_ALGORITHM_DEFAULT_LIMIT;
+    if (NATIVE_APP_ALGORITHM_CUSTOM == pOptions->eMode) {
+        pOptions->uiLimit = 1U;
+    }
+    while (uiIndex < uiArgumentCount) {
+        if ((0 == strcmp("--start", ppcArguments[uiIndex])) &&
+            ((uiIndex + 1U) < uiArgumentCount) &&
+            ParseNativeAppNumber(ppcArguments[uiIndex + 1U],
+                                 &pOptions->uiStart) &&
+            (0U < pOptions->uiStart)) {
+            uiIndex += 2U;
+        }
+        else if ((0 == strcmp("--limit", ppcArguments[uiIndex])) &&
+                 ((uiIndex + 1U) < uiArgumentCount) &&
+                 ParseNativeAppNumber(ppcArguments[uiIndex + 1U],
+                                      &pOptions->uiLimit) &&
+                 (0U < pOptions->uiLimit)) {
+            uiIndex += 2U;
+        }
+        else if (0 == strcmp("--all", ppcArguments[uiIndex])) {
+            pOptions->uiLimit = 0U;
+            uiIndex++;
+        }
+        else if ((0 == strcmp("--port", ppcArguments[uiIndex])) &&
+                 ((uiIndex + 1U) < uiArgumentCount) &&
+                 ParseNativeAppNumber(ppcArguments[uiIndex + 1U],
+                                      &pOptions->uiPort) &&
+                 (0U < pOptions->uiPort) &&
+                 (UINT16_MAX >= pOptions->uiPort)) {
+            uiIndex += 2U;
+        }
+        else if ((0 == strcmp("--delay-ms", ppcArguments[uiIndex])) &&
+                 ((uiIndex + 1U) < uiArgumentCount) &&
+                 ParseNativeAppNumber(ppcArguments[uiIndex + 1U],
+                                      &pOptions->uiDelayMs)) {
+            uiIndex += 2U;
+        }
+        else if ((0 == strcmp("--results", ppcArguments[uiIndex])) &&
+                 ((uiIndex + 1U) < uiArgumentCount)) {
+            pOptions->pcResultsPath = ppcArguments[uiIndex + 1U];
+            uiIndex += 2U;
+        }
+        else if ((0 == strcmp("--ike", ppcArguments[uiIndex])) &&
+                 ((uiIndex + 1U) < uiArgumentCount)) {
+            pOptions->pcCustomIke = ppcArguments[uiIndex + 1U];
+            uiIndex += 2U;
+        }
+        else if ((0 == strcmp("--esp", ppcArguments[uiIndex])) &&
+                 ((uiIndex + 1U) < uiArgumentCount)) {
+            pOptions->pcCustomEsp = ppcArguments[uiIndex + 1U];
+            uiIndex += 2U;
+        }
+        else if (0 == strcmp("--continue-on-error",
+                             ppcArguments[uiIndex])) {
+            pOptions->bContinueOnError = true;
+            uiIndex++;
+        }
+        else if (0 == strcmp("--stop-on-error",
+                             ppcArguments[uiIndex])) {
+            pOptions->bContinueOnError = false;
+            uiIndex++;
+        }
+        else {
+            return IPSEC_ERR_INVALID_ARGUMENT;
+        }
+    }
+    if ((NATIVE_APP_ALGORITHM_CUSTOM == pOptions->eMode) &&
+        ((NULL == pOptions->pcCustomIke) ||
+         (NULL == pOptions->pcCustomEsp))) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    else if ((NATIVE_APP_ALGORITHM_CUSTOM != pOptions->eMode) &&
+             ((NULL != pOptions->pcCustomIke) ||
+              (NULL != pOptions->pcCustomEsp))) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    else {
+        return IPSEC_OK;
+    }
+}
+
+static IpsecError_t CheckNativeAppAlgorithmCatalog(
+    const NativeAppConfig_t *pConfig,
+    NativeAppAlgorithmMode_t eMode)
+{
+    uint32_t uiCount = GetNativeAppAlgorithmCaseCount(eMode);
+    uint32_t uiIndex;
+
+    for (uiIndex = 0U; uiIndex < uiCount; uiIndex++) {
+        NativeAppAlgorithmCase_t Case;
+        IpsecError_t eError = GetNativeAppAlgorithmCase(
+            eMode, uiIndex, pConfig,
+            (NATIVE_APP_ALGORITHM_CUSTOM == eMode) ?
+            pConfig->acIkeProposals : NULL,
+            (NATIVE_APP_ALGORITHM_CUSTOM == eMode) ?
+            pConfig->acEspProposals : NULL, &Case);
+
+        if (IPSEC_OK != eError) {
+            return eError;
+        }
+    }
+    (void)printf("algorithm catalog valid: mode=%s cases=%" PRIu32 "\n",
+                 GetNativeAppAlgorithmModeName(eMode), uiCount);
+    return IPSEC_OK;
+}
+
+static IpsecError_t ExecuteNativeAppAlgorithmCommand(
+    NativeAppSession_t *pSession,
+    uint32_t uiArgumentCount,
+    char **ppcArguments)
+{
+    NativeAppAlgorithmMode_t eMode;
+    IpsecError_t eError;
+
+    if ((4U == uiArgumentCount) &&
+        (0 == strcmp("count", ppcArguments[2])) &&
+        ParseNativeAppAlgorithmMode(ppcArguments[3], &eMode)) {
+        (void)printf("algorithm cases: mode=%s count=%" PRIu32 "\n",
+                     GetNativeAppAlgorithmModeName(eMode),
+                     GetNativeAppAlgorithmCaseCount(eMode));
+        eError = IPSEC_OK;
+    }
+    else if ((4U == uiArgumentCount) &&
+             (0 == strcmp("check", ppcArguments[2])) &&
+             ParseNativeAppAlgorithmMode(ppcArguments[3], &eMode)) {
+        eError = RequireNativeAppConfig(pSession);
+        if (IPSEC_OK == eError) {
+            eError = CheckNativeAppAlgorithmCatalog(&pSession->Config, eMode);
+        }
+    }
+    else if ((3U <= uiArgumentCount) &&
+             (0 == strcmp("serve", ppcArguments[2]))) {
+        uint32_t uiPort = NATIVE_APP_ALGORITHM_DEFAULT_PORT;
+
+        if ((5U == uiArgumentCount) &&
+            (0 == strcmp("--port", ppcArguments[3])) &&
+            ParseNativeAppNumber(ppcArguments[4], &uiPort) &&
+            (0U < uiPort) && (UINT16_MAX >= uiPort)) {
+            eError = IPSEC_OK;
+        }
+        else if (3U == uiArgumentCount) {
+            eError = IPSEC_OK;
+        }
+        else {
+            eError = IPSEC_ERR_INVALID_ARGUMENT;
+        }
+        if ((IPSEC_OK == eError) && pSession->bConnectionLoaded) {
+            (void)fprintf(stderr,
+                          "unload the session connection before serving tests\n");
+            eError = IPSEC_ERR_INVALID_ARGUMENT;
+        }
+        if (IPSEC_OK == eError) {
+            eError = RequireNativeAppConfig(pSession);
+        }
+        if (IPSEC_OK == eError) {
+            ResetNativeAppStopRequest();
+            eError = RunNativeAppAlgorithmServer(
+                pSession->pContext, &pSession->Config, uiPort);
+            ResetNativeAppStopRequest();
+            pSession->bCredentialLoaded = true;
+        }
+    }
+    else if ((4U <= uiArgumentCount) &&
+             (0 == strcmp("run", ppcArguments[2]))) {
+        NativeAppAlgorithmOptions_t Options;
+
+        if (pSession->bConnectionLoaded) {
+            (void)fprintf(stderr,
+                          "unload the session connection before algorithm tests\n");
+            eError = IPSEC_ERR_INVALID_ARGUMENT;
+        }
+        else {
+            eError = RequireNativeAppConfig(pSession);
+        }
+        if (IPSEC_OK == eError) {
+            eError = ParseNativeAppAlgorithmRunOptions(
+                uiArgumentCount, ppcArguments, &Options);
+        }
+        if (IPSEC_OK == eError) {
+            ResetNativeAppStopRequest();
+            eError = RunNativeAppAlgorithmClient(
+                pSession->pContext, &pSession->Config, &Options);
+            ResetNativeAppStopRequest();
+            pSession->bCredentialLoaded = true;
+        }
+    }
+    else {
+        eError = IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    return eError;
+}
+
 static IpsecError_t ExecuteNativeAppConfigCommand(
     NativeAppSession_t *pSession,
     uint32_t uiArgumentCount,
@@ -931,6 +1153,12 @@ static IpsecError_t ExecuteNativeAppCommand(
              (0 == strcmp("loop", ppcArguments[1]))) {
         eError = ExecuteNativeAppLoopCommand(pSession, uiArgumentCount,
                                              ppcArguments, 2U);
+    }
+    else if ((3U <= uiArgumentCount) &&
+             (0 == strcmp("test", ppcArguments[0])) &&
+             (0 == strcmp("algorithm", ppcArguments[1]))) {
+        eError = ExecuteNativeAppAlgorithmCommand(
+            pSession, uiArgumentCount, ppcArguments);
     }
     else if ((1U == uiArgumentCount) &&
              (0 == strcmp("check", ppcArguments[0]))) {
