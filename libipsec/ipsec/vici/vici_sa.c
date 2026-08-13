@@ -447,9 +447,7 @@ static IpsecError_t CollectIkeValue(
                                   sizeof(pInfo->acProposal), pElement);
     }
     else if (MatchSaText(pElement->pucName, pElement->ucNameLength,
-                         "encr-keysize") ||
-             MatchSaText(pElement->pucName, pElement->ucNameLength,
-                         "integ-keysize")) {
+                         "encr-keysize")) {
         eError = AppendSaKeySize(pInfo->acProposal,
                                  sizeof(pInfo->acProposal), pElement);
     }
@@ -563,9 +561,7 @@ static IpsecError_t CollectChildValue(
                                   sizeof(pInfo->acProposal), pElement);
     }
     else if (MatchSaText(pElement->pucName, pElement->ucNameLength,
-                         "encr-keysize") ||
-             MatchSaText(pElement->pucName, pElement->ucNameLength,
-                         "integ-keysize")) {
+                         "encr-keysize")) {
         eError = AppendSaKeySize(pInfo->acProposal,
                                  sizeof(pInfo->acProposal), pElement);
     }
