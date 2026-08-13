@@ -92,6 +92,17 @@ int main(void)
         /* Custom PFS and ESN metadata is correct. */
     }
 
+    if ((0 != strcmp("none",
+                     GetNativeAppAlgorithmErrorText(IPSEC_OK))) ||
+        (0 != strcmp("invalid argument", GetNativeAppAlgorithmErrorText(
+            IPSEC_ERR_INVALID_ARGUMENT)))) {
+        (void)fprintf(stderr, "algorithm error text mismatch\n");
+        iFailed = 1;
+    }
+    else {
+        /* Success and failure use distinct error field text. */
+    }
+
     if (0 == iFailed) {
         (void)printf("algorithm catalog tests passed\n");
     }

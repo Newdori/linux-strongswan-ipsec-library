@@ -125,6 +125,8 @@ if(BUILD_TESTING)
         -Wall -Wextra -Wpedantic -Werror)
     target_include_directories(test_app_algorithm_catalog PRIVATE
         ../include ../app)
+    target_link_libraries(test_app_algorithm_catalog PRIVATE
+        ipsec_native_static)
     add_test(NAME app_algorithm_catalog COMMAND test_app_algorithm_catalog)
 
     add_executable(test_app_loop

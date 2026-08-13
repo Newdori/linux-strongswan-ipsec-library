@@ -742,7 +742,7 @@ IpsecError_t FinishNativeAppAlgorithmCaseReport(
             pResult->bXfrmVerified ? "PASS" : "FAIL",
             pResult->bDataPathVerified ? "PASS" : "FAIL",
             GetNativeAppAlgorithmResultName(pResult->eResult),
-            GetIpsecErrorString(pResult->eError),
+            GetNativeAppAlgorithmErrorText(pResult->eError),
             GetIpsecErrorString(eCleanup), uiConnections, uiIkes,
             uiChildren, uiStates, uiPolicies,
             (NATIVE_APP_ALGORITHM_RESULT_PASS == pResult->eResult) ?
@@ -815,7 +815,7 @@ IpsecError_t FinishNativeAppAlgorithmCaseReport(
             (NATIVE_APP_ALGORITHM_RESULT_PASS == pResult->eResult) ?
             "PASS" : "FAIL",
             GetNativeAppAlgorithmResultName(pResult->eResult),
-            GetIpsecErrorString(pResult->eError),
+            GetNativeAppAlgorithmErrorText(pResult->eError),
             GetIpsecErrorString(eCleanup), pResult->ullDurationMs);
         (void)fclose(pFile);
     }
@@ -839,7 +839,7 @@ IpsecError_t FinishNativeAppAlgorithmCaseReport(
             ('\0' == pResult->acPeerResult[0]) ? "N/A" :
             pResult->acPeerResult,
             GetNativeAppAlgorithmResultName(pResult->eResult),
-            GetIpsecErrorString(pResult->eError),
+            GetNativeAppAlgorithmErrorText(pResult->eError),
             GetIpsecErrorString(eCleanup));
         (void)fclose(pFile);
     }

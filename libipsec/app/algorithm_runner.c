@@ -884,7 +884,7 @@ static IpsecError_t OpenNativeAppAlgorithmJson(
     if (NULL == pWriter->pFile) {
         return IPSEC_ERR_FILE_OPEN;
     }
-    (void)fputs("{\n  \"schema_version\": 2,\n  \"run_id\": ",
+    (void)fputs("{\n  \"schema_version\": 3,\n  \"run_id\": ",
                 pWriter->pFile);
     WriteNativeAppJsonString(pWriter->pFile, pcRunId);
     (void)fputs(",\n  \"mode\": ", pWriter->pFile);
@@ -939,10 +939,11 @@ static IpsecError_t AppendNativeAppAlgorithmJson(
     WriteNativeAppJsonString(pFile,
                              GetNativeAppAlgorithmResultName(pResult->eResult));
     (void)fputs(", \"error\": ", pFile);
-    WriteNativeAppJsonString(pFile, GetIpsecErrorString(pResult->eError));
+    WriteNativeAppJsonString(
+        pFile, GetNativeAppAlgorithmErrorText(pResult->eError));
     (void)fputs(", \"cleanup_error\": ", pFile);
     WriteNativeAppJsonString(
-        pFile, GetIpsecErrorString(pResult->eCleanupError));
+        pFile, GetNativeAppAlgorithmErrorText(pResult->eCleanupError));
     (void)fprintf(pFile,
         ", \"ike_result\": \"%s\", \"esp_result\": \"%s\", "
         "\"xfrm_result\": \"%s\", \"data_path_result\": \"%s\"",
@@ -1420,7 +1421,8 @@ IpsecError_t RunNativeAppAlgorithmClient(
             "PASS" : "FAIL",
             "result=%s case=%s duration=%" PRIu64 " ms error=%s",
             GetNativeAppAlgorithmResultName(Result.eResult), Result.Case.acId,
-            Result.ullDurationMs, GetIpsecErrorString(Result.eError));
+            Result.ullDurationMs,
+            GetNativeAppAlgorithmErrorText(Result.eError));
         if (IPSEC_OK != AppendNativeAppAlgorithmJson(&Writer, &Result)) {
             eError = IPSEC_ERR_FILE_READ;
         }

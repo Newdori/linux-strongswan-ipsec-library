@@ -315,6 +315,9 @@ created initiator result directory; directory components are intentionally
 ignored. Change the root before running with `config set output_root DIR` or
 the v15-compatible `output_root=DIR` configuration setting:
 
+Result error fields use `none` when no error occurred. When an operation
+fails, the field contains the corresponding library error text instead.
+
 ```text
 ipsec> test algorithm run baseline --all --results baseline-results.json
 ipsec> test algorithm run exhaustive-ike --start 1 --limit 100 --results ike-part-001.json

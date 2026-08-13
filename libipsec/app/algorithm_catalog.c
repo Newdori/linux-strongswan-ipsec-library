@@ -160,6 +160,19 @@ static bool HasNativeAppAlgorithmToken(
     return false;
 }
 
+const char *GetNativeAppAlgorithmErrorText(IpsecError_t eError)
+{
+    const char *pcText;
+
+    if (IPSEC_OK == eError) {
+        pcText = "none";
+    }
+    else {
+        pcText = GetIpsecErrorString(eError);
+    }
+    return pcText;
+}
+
 static IpsecError_t SetNativeAppExpectedChildKe(
     NativeAppAlgorithmCase_t *pCase)
 {

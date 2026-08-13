@@ -144,6 +144,9 @@ typedef struct NativeAppAlgorithmOptions {
 const char *GetNativeAppAlgorithmResultName(
     NativeAppAlgorithmResult_t eResult);
 
+const char *GetNativeAppAlgorithmErrorText(
+    IpsecError_t eError);
+
 IpsecError_t WriteNativeAppAlgorithmRunReport(
     IpsecContext_t *pContext,
     const NativeAppConfig_t *pConfig,
