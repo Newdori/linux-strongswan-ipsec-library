@@ -157,11 +157,26 @@ typedef struct NativeAppAlgorithmCase {
     bool bExpectNoEsn;
 } NativeAppAlgorithmCase_t;
 
+typedef struct NativeAppAlgorithmCleanup {
+    IpsecError_t eTerminateError;
+    IpsecError_t eWaitRemovedError;
+    IpsecError_t eRemoveConnectionError;
+    IpsecError_t eFinalVerifyError;
+    IpsecError_t ePeerError;
+    uint32_t uiTerminateAttempts;
+    uint32_t uiWaitRemovedAttempts;
+    uint32_t uiRemoveConnectionAttempts;
+    uint32_t uiPeerAttempts;
+    bool bRecovered;
+    bool bLocalVerified;
+} NativeAppAlgorithmCleanup_t;
+
 typedef struct NativeAppAlgorithmCaseResult {
     NativeAppAlgorithmCase_t Case;
     NativeAppAlgorithmResult_t eResult;
     IpsecError_t eError;
     IpsecError_t eCleanupError;
+    NativeAppAlgorithmCleanup_t Cleanup;
     uint32_t uiReqid;
     uint32_t uiXfrmStateCount;
     uint32_t uiXfrmPolicyCount;
@@ -226,8 +241,7 @@ IpsecError_t FinishNativeAppAlgorithmCaseReport(
     const char *pcResultDirectory,
     const char *pcCaseDirectory,
     uint32_t uiOrdinal,
-    uint32_t uiRequested,
-    IpsecError_t eCleanup);
+    uint32_t uiRequested);
 
 void InitializeNativeAppConfig(NativeAppConfig_t *pConfig);
 
@@ -396,6 +410,12 @@ IpsecError_t WaitNativeAppRemoved(
     IpsecContext_t *pContext,
     const NativeAppConfig_t *pConfig,
     uint32_t uiReqid);
+
+IpsecError_t WaitNativeAppRemovedWithTimeout(
+    IpsecContext_t *pContext,
+    const NativeAppConfig_t *pConfig,
+    uint32_t uiReqid,
+    uint32_t uiTimeoutMs);
 
 bool ParseNativeAppShowOptions(
     uint32_t uiArgumentCount,

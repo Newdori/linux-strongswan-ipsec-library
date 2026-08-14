@@ -388,7 +388,12 @@ IpsecError_t WriteNativeAppAlgorithmRunReport(
                 "number,case_id,role,ike_proposal,esp_proposal,"
                 "negotiated_ike,negotiated_esp,reqid,xfrm_states,"
                 "xfrm_policies,ike_result,esp_result,xfrm_result,"
-                "data_path_result,duration_ms,peer_result,result,error,cleanup\n",
+                "data_path_result,duration_ms,peer_result,result,error,cleanup,"
+                "cleanup_terminate,cleanup_wait_removed,"
+                "cleanup_remove_connection,cleanup_final_verify,cleanup_peer,"
+                "cleanup_terminate_attempts,cleanup_wait_attempts,"
+                "cleanup_remove_attempts,cleanup_peer_attempts,"
+                "cleanup_recovered,cleanup_local_verified\n",
                 pFile);
             (void)fclose(pFile);
         }
@@ -685,8 +690,7 @@ IpsecError_t FinishNativeAppAlgorithmCaseReport(
     const char *pcResultDirectory,
     const char *pcCaseDirectory,
     uint32_t uiOrdinal,
-    uint32_t uiRequested,
-    IpsecError_t eCleanup)
+    uint32_t uiRequested)
 {
     uint32_t uiConnections = 0U;
     uint32_t uiIkes = 0U;
@@ -707,10 +711,33 @@ IpsecError_t FinishNativeAppAlgorithmCaseReport(
     if (NULL != pFile) {
         (void)fprintf(pFile,
             "cleanup=%s\nconnection_remaining=%" PRIu32
+            "\nterminate_error=%s\nwait_removed_error=%s"
+            "\nremove_connection_error=%s\nfinal_verify_error=%s"
+            "\npeer_error=%s\nterminate_attempts=%" PRIu32
+            "\nwait_removed_attempts=%" PRIu32
+            "\nremove_connection_attempts=%" PRIu32
+            "\npeer_attempts=%" PRIu32
+            "\nrecovered=%s\nlocal_verified=%s"
             "\nike_remaining=%" PRIu32 "\nchild_remaining=%" PRIu32
             "\nxfrm_states_remaining=%" PRIu32
             "\nxfrm_policies_remaining=%" PRIu32 "\n",
-            GetIpsecErrorString(eCleanup), uiConnections, uiIkes,
+            GetNativeAppAlgorithmErrorText(pResult->eCleanupError),
+            uiConnections,
+            GetNativeAppAlgorithmErrorText(
+                pResult->Cleanup.eTerminateError),
+            GetNativeAppAlgorithmErrorText(
+                pResult->Cleanup.eWaitRemovedError),
+            GetNativeAppAlgorithmErrorText(
+                pResult->Cleanup.eRemoveConnectionError),
+            GetNativeAppAlgorithmErrorText(
+                pResult->Cleanup.eFinalVerifyError),
+            GetNativeAppAlgorithmErrorText(pResult->Cleanup.ePeerError),
+            pResult->Cleanup.uiTerminateAttempts,
+            pResult->Cleanup.uiWaitRemovedAttempts,
+            pResult->Cleanup.uiRemoveConnectionAttempts,
+            pResult->Cleanup.uiPeerAttempts,
+            pResult->Cleanup.bRecovered ? "yes" : "no",
+            pResult->Cleanup.bLocalVerified ? "yes" : "no", uiIkes,
             uiChildren, uiStates, uiPolicies);
         (void)fclose(pFile);
     }
@@ -725,7 +752,14 @@ IpsecError_t FinishNativeAppAlgorithmCaseReport(
             "\npeer_result=%s\nduration_ms=%" PRIu64
             "\nike_result=%s\nesp_result=%s\nxfrm_result=%s\n"
             "data_path_result=%s\n"
-            "\nresult=%s\nerror=%s\ncleanup=%s\n"
+            "\nresult=%s\nerror=%s\ncleanup=%s"
+            "\ncleanup_terminate=%s\ncleanup_wait_removed=%s"
+            "\ncleanup_remove_connection=%s\ncleanup_final_verify=%s"
+            "\ncleanup_peer=%s\ncleanup_terminate_attempts=%" PRIu32
+            "\ncleanup_wait_attempts=%" PRIu32
+            "\ncleanup_remove_attempts=%" PRIu32
+            "\ncleanup_peer_attempts=%" PRIu32
+            "\ncleanup_recovered=%s\ncleanup_local_verified=%s\n"
             "connection_remaining=%" PRIu32 "\nike_remaining=%" PRIu32
             "\nchild_remaining=%" PRIu32
             "\nxfrm_states_remaining=%" PRIu32
@@ -743,7 +777,23 @@ IpsecError_t FinishNativeAppAlgorithmCaseReport(
             pResult->bDataPathVerified ? "PASS" : "FAIL",
             GetNativeAppAlgorithmResultName(pResult->eResult),
             GetNativeAppAlgorithmErrorText(pResult->eError),
-            GetIpsecErrorString(eCleanup), uiConnections, uiIkes,
+            GetNativeAppAlgorithmErrorText(pResult->eCleanupError),
+            GetNativeAppAlgorithmErrorText(
+                pResult->Cleanup.eTerminateError),
+            GetNativeAppAlgorithmErrorText(
+                pResult->Cleanup.eWaitRemovedError),
+            GetNativeAppAlgorithmErrorText(
+                pResult->Cleanup.eRemoveConnectionError),
+            GetNativeAppAlgorithmErrorText(
+                pResult->Cleanup.eFinalVerifyError),
+            GetNativeAppAlgorithmErrorText(pResult->Cleanup.ePeerError),
+            pResult->Cleanup.uiTerminateAttempts,
+            pResult->Cleanup.uiWaitRemovedAttempts,
+            pResult->Cleanup.uiRemoveConnectionAttempts,
+            pResult->Cleanup.uiPeerAttempts,
+            pResult->Cleanup.bRecovered ? "yes" : "no",
+            pResult->Cleanup.bLocalVerified ? "yes" : "no",
+            uiConnections, uiIkes,
             uiChildren, uiStates, uiPolicies,
             (NATIVE_APP_ALGORITHM_RESULT_PASS == pResult->eResult) ?
             "PASS" : "FAIL");
@@ -802,7 +852,11 @@ IpsecError_t FinishNativeAppAlgorithmCaseReport(
             " policies=%" PRIu32 "\n[%s] IKE phase=%s\n"
             "[%s] ESP phase=%s XFRM=%s DATA_PATH=%s\n"
             "[%s] result=%s error=%s "
-            "cleanup=%s duration=%" PRIu64 " ms\n",
+            "cleanup=%s duration=%" PRIu64 " ms\n"
+            "[INFO] cleanup stages: terminate=%s wait_removed=%s "
+            "remove_connection=%s final_verify=%s peer=%s "
+            "attempts=%" PRIu32 "/%" PRIu32 "/%" PRIu32 "/%" PRIu32
+            " recovered=%s local_verified=%s\n",
             pResult->acNegotiatedIke, pResult->acNegotiatedEsp,
             pResult->uiReqid, pResult->uiXfrmStateCount,
             pResult->uiXfrmPolicyCount,
@@ -816,7 +870,23 @@ IpsecError_t FinishNativeAppAlgorithmCaseReport(
             "PASS" : "FAIL",
             GetNativeAppAlgorithmResultName(pResult->eResult),
             GetNativeAppAlgorithmErrorText(pResult->eError),
-            GetIpsecErrorString(eCleanup), pResult->ullDurationMs);
+            GetNativeAppAlgorithmErrorText(pResult->eCleanupError),
+            pResult->ullDurationMs,
+            GetNativeAppAlgorithmErrorText(
+                pResult->Cleanup.eTerminateError),
+            GetNativeAppAlgorithmErrorText(
+                pResult->Cleanup.eWaitRemovedError),
+            GetNativeAppAlgorithmErrorText(
+                pResult->Cleanup.eRemoveConnectionError),
+            GetNativeAppAlgorithmErrorText(
+                pResult->Cleanup.eFinalVerifyError),
+            GetNativeAppAlgorithmErrorText(pResult->Cleanup.ePeerError),
+            pResult->Cleanup.uiTerminateAttempts,
+            pResult->Cleanup.uiWaitRemovedAttempts,
+            pResult->Cleanup.uiRemoveConnectionAttempts,
+            pResult->Cleanup.uiPeerAttempts,
+            pResult->Cleanup.bRecovered ? "yes" : "no",
+            pResult->Cleanup.bLocalVerified ? "yes" : "no");
         (void)fclose(pFile);
     }
     pFile = OpenReportFile(pcResultDirectory, "matrix_summary.csv", "a");
@@ -825,7 +895,9 @@ IpsecError_t FinishNativeAppAlgorithmCaseReport(
             "%" PRIu32 ",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\","
             "%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",\"%s\",\"%s\",\"%s\","
             "\"%s\",%" PRIu64 ",\"%s\","
-            "\"%s\",\"%s\",\"%s\"\n",
+            "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\","
+            "\"%s\",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
+            ",\"%s\",\"%s\"\n",
             pResult->Case.uiNumber, pResult->Case.acId, pcRole,
             pResult->Case.acIkeProposal, pResult->Case.acEspProposal,
             pResult->acNegotiatedIke, pResult->acNegotiatedEsp,
@@ -840,7 +912,22 @@ IpsecError_t FinishNativeAppAlgorithmCaseReport(
             pResult->acPeerResult,
             GetNativeAppAlgorithmResultName(pResult->eResult),
             GetNativeAppAlgorithmErrorText(pResult->eError),
-            GetIpsecErrorString(eCleanup));
+            GetNativeAppAlgorithmErrorText(pResult->eCleanupError),
+            GetNativeAppAlgorithmErrorText(
+                pResult->Cleanup.eTerminateError),
+            GetNativeAppAlgorithmErrorText(
+                pResult->Cleanup.eWaitRemovedError),
+            GetNativeAppAlgorithmErrorText(
+                pResult->Cleanup.eRemoveConnectionError),
+            GetNativeAppAlgorithmErrorText(
+                pResult->Cleanup.eFinalVerifyError),
+            GetNativeAppAlgorithmErrorText(pResult->Cleanup.ePeerError),
+            pResult->Cleanup.uiTerminateAttempts,
+            pResult->Cleanup.uiWaitRemovedAttempts,
+            pResult->Cleanup.uiRemoveConnectionAttempts,
+            pResult->Cleanup.uiPeerAttempts,
+            pResult->Cleanup.bRecovered ? "yes" : "no",
+            pResult->Cleanup.bLocalVerified ? "yes" : "no");
         (void)fclose(pFile);
     }
     return IPSEC_OK;

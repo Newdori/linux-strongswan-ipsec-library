@@ -296,14 +296,18 @@ static IpsecError_t VerifyNativeAppInstalled(
     return eError;
 }
 
-IpsecError_t WaitNativeAppRemoved(
+IpsecError_t WaitNativeAppRemovedWithTimeout(
     IpsecContext_t *pContext,
     const NativeAppConfig_t *pConfig,
-    uint32_t uiReqid)
+    uint32_t uiReqid,
+    uint32_t uiTimeoutMs)
 {
     uint32_t uiElapsed = 0U;
 
-    while ((uiElapsed <= pConfig->uiTimeoutMs) &&
+    if ((NULL == pContext) || (NULL == pConfig)) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    while ((uiElapsed <= uiTimeoutMs) &&
            (0 == gbNativeAppStopRequested)) {
         IpsecIkeSaList_t IkeList = {0};
         IpsecChildSaList_t ChildList = {0};
@@ -373,6 +377,20 @@ IpsecError_t WaitNativeAppRemoved(
         }
     }
     return IPSEC_ERR_VICI_TIMEOUT;
+}
+
+IpsecError_t WaitNativeAppRemoved(
+    IpsecContext_t *pContext,
+    const NativeAppConfig_t *pConfig,
+    uint32_t uiReqid)
+{
+    if (NULL == pConfig) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    else {
+        return WaitNativeAppRemovedWithTimeout(
+            pContext, pConfig, uiReqid, pConfig->uiTimeoutMs);
+    }
 }
 
 IpsecError_t RunNativeAppLoop(

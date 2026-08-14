@@ -18,6 +18,9 @@
 #define NATIVE_APP_ALGORITHM_PROTOCOL       "IPSEC-ALGORITHM-1"
 #define NATIVE_APP_ALGORITHM_MESSAGE_LENGTH 1024U
 #define NATIVE_APP_ALGORITHM_POLL_MS         500U
+#define NATIVE_APP_ALGORITHM_CLEANUP_ATTEMPTS 3U
+#define NATIVE_APP_ALGORITHM_CLEANUP_WAIT_MS  5000U
+#define NATIVE_APP_ALGORITHM_CLEANUP_RETRY_MS 200U
 #define NATIVE_APP_ARRAY_COUNT(a) \
     ((uint32_t)(sizeof(a) / sizeof((a)[0])))
 
@@ -803,41 +806,191 @@ static void ReportNativeAppAlgorithmFinalState(
     FreeIpsecConnectionList(&ConnectionList);
 }
 
+static void RecordNativeAppAlgorithmCleanupError(
+    IpsecError_t *peTarget,
+    IpsecError_t eError)
+{
+    if ((NULL != peTarget) && (IPSEC_OK == *peTarget) &&
+        (IPSEC_OK != eError)) {
+        *peTarget = eError;
+    }
+    else {
+        /* Preserve the first error observed for this cleanup stage. */
+    }
+}
+
+static bool IsNativeAppAlgorithmCleanupAbsent(IpsecError_t eError)
+{
+    return (IPSEC_ERR_CONNECTION_NOT_FOUND == eError) ||
+           (IPSEC_ERR_IKE_FAILED == eError);
+}
+
+static uint32_t GetNativeAppAlgorithmCleanupWaitMs(
+    const NativeAppConfig_t *pConfig)
+{
+    uint32_t uiWaitMs = pConfig->uiTimeoutMs;
+
+    if ((0U == uiWaitMs) ||
+        (NATIVE_APP_ALGORITHM_CLEANUP_WAIT_MS < uiWaitMs)) {
+        uiWaitMs = NATIVE_APP_ALGORITHM_CLEANUP_WAIT_MS;
+    }
+    return uiWaitMs;
+}
+
+static IpsecError_t CheckNativeAppAlgorithmConnectionRemoved(
+    IpsecContext_t *pContext,
+    const NativeAppConfig_t *pConfig,
+    bool *pbRemoved)
+{
+    IpsecConnectionList_t ConnectionList = {0};
+    IpsecError_t eError;
+    uint32_t uiIndex;
+
+    if ((NULL == pContext) || (NULL == pConfig) || (NULL == pbRemoved)) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    *pbRemoved = true;
+    eError = GetIpsecConnections(pContext, &ConnectionList);
+    if (IPSEC_OK == eError) {
+        for (uiIndex = 0U; uiIndex < ConnectionList.uiCount; uiIndex++) {
+            if (0 == strcmp(pConfig->acConnectionName,
+                            ConnectionList.pItems[uiIndex].acName)) {
+                *pbRemoved = false;
+                break;
+            }
+            else {
+                /* Check the next loaded connection. */
+            }
+        }
+    }
+    FreeIpsecConnectionList(&ConnectionList);
+    return eError;
+}
+
 static IpsecError_t CleanupNativeAppAlgorithmCase(
     IpsecContext_t *pContext,
     const NativeAppConfig_t *pConfig,
     uint32_t uiReqid,
-    bool bTerminate)
+    bool bTerminate,
+    NativeAppAlgorithmCleanup_t *pCleanup)
 {
     IpsecControlOptions_t Control = {
         .uiStructSize = sizeof(IpsecControlOptions_t),
-        .eMode = IPSEC_CONTROL_WAIT,
-        .uiTimeoutMs = pConfig->uiTimeoutMs
+        .eMode = IPSEC_CONTROL_IMMEDIATE,
+        .uiTimeoutMs = 0U
     };
-    IpsecError_t eFirstError = IPSEC_OK;
+    uint32_t uiWaitMs;
+    uint32_t uiAttempt;
     IpsecError_t eError;
+    IpsecError_t eFinalError = IPSEC_OK;
+    bool bSaRemoved = false;
+    bool bConnectionRemoved = false;
 
-    if (bTerminate) {
-        eFirstError = TerminateIpsecIke(pContext,
-                                        pConfig->acConnectionName,
-                                        &Control);
-        if ((IPSEC_ERR_CONNECTION_NOT_FOUND == eFirstError) ||
-            (IPSEC_ERR_IKE_FAILED == eFirstError)) {
-            eFirstError = IPSEC_OK;
+    if ((NULL == pContext) || (NULL == pConfig) || (NULL == pCleanup)) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    (void)memset(pCleanup, 0, sizeof(*pCleanup));
+    uiWaitMs = GetNativeAppAlgorithmCleanupWaitMs(pConfig);
+    for (uiAttempt = 0U;
+         (uiAttempt < NATIVE_APP_ALGORITHM_CLEANUP_ATTEMPTS) && !bSaRemoved;
+         uiAttempt++) {
+        if (bTerminate) {
+            pCleanup->uiTerminateAttempts++;
+            eError = TerminateIpsecIke(pContext,
+                                       pConfig->acConnectionName,
+                                       &Control);
+            if (IsNativeAppAlgorithmCleanupAbsent(eError)) {
+                eError = IPSEC_OK;
+            }
+            else {
+                RecordNativeAppAlgorithmCleanupError(
+                    &pCleanup->eTerminateError, eError);
+            }
+        }
+        pCleanup->uiWaitRemovedAttempts++;
+        eError = WaitNativeAppRemovedWithTimeout(
+            pContext, pConfig, uiReqid, uiWaitMs);
+        if (IPSEC_OK == eError) {
+            bSaRemoved = true;
+        }
+        else {
+            RecordNativeAppAlgorithmCleanupError(
+                &pCleanup->eWaitRemovedError, eError);
+            if ((uiAttempt + 1U) <
+                NATIVE_APP_ALGORITHM_CLEANUP_ATTEMPTS) {
+                SleepNativeAppAlgorithm(
+                    NATIVE_APP_ALGORITHM_CLEANUP_RETRY_MS);
+            }
+            else {
+                /* The final verification below records the terminal state. */
+            }
         }
     }
-    if (IPSEC_OK == eFirstError) {
-        eError = WaitNativeAppRemoved(pContext, pConfig, uiReqid);
-        if (IPSEC_OK != eError) {
-            eFirstError = eError;
+    for (uiAttempt = 0U;
+         (uiAttempt < NATIVE_APP_ALGORITHM_CLEANUP_ATTEMPTS) &&
+         !bConnectionRemoved;
+         uiAttempt++) {
+        pCleanup->uiRemoveConnectionAttempts++;
+        eError = RemoveIpsecConnection(pContext, pConfig->acConnectionName);
+        if ((IPSEC_OK == eError) ||
+            (IPSEC_ERR_CONNECTION_NOT_FOUND == eError)) {
+            bConnectionRemoved = true;
+        }
+        else {
+            RecordNativeAppAlgorithmCleanupError(
+                &pCleanup->eRemoveConnectionError, eError);
+            eError = CheckNativeAppAlgorithmConnectionRemoved(
+                pContext, pConfig, &bConnectionRemoved);
+            if (!bConnectionRemoved &&
+                ((uiAttempt + 1U) <
+                 NATIVE_APP_ALGORITHM_CLEANUP_ATTEMPTS)) {
+                SleepNativeAppAlgorithm(
+                    NATIVE_APP_ALGORITHM_CLEANUP_RETRY_MS);
+            }
+            else {
+                /* Removal completed or the retry budget is exhausted. */
+            }
         }
     }
-    eError = RemoveIpsecConnection(pContext, pConfig->acConnectionName);
-    if ((IPSEC_ERR_CONNECTION_NOT_FOUND != eError) &&
-        (IPSEC_OK == eFirstError) && (IPSEC_OK != eError)) {
-        eFirstError = eError;
+    eError = WaitNativeAppRemovedWithTimeout(pContext, pConfig, uiReqid, 0U);
+    if (IPSEC_OK != eError) {
+        RecordNativeAppAlgorithmCleanupError(
+            &pCleanup->eFinalVerifyError, eError);
+        eFinalError = eError;
     }
-    return eFirstError;
+    eError = CheckNativeAppAlgorithmConnectionRemoved(
+        pContext, pConfig, &bConnectionRemoved);
+    if (IPSEC_OK != eError) {
+        RecordNativeAppAlgorithmCleanupError(
+            &pCleanup->eFinalVerifyError, eError);
+        if (IPSEC_OK == eFinalError) {
+            eFinalError = eError;
+        }
+    }
+    else if (!bConnectionRemoved) {
+        RecordNativeAppAlgorithmCleanupError(
+            &pCleanup->eFinalVerifyError, IPSEC_ERR_VICI_TIMEOUT);
+        if (IPSEC_OK == eFinalError) {
+            eFinalError = IPSEC_ERR_VICI_TIMEOUT;
+        }
+    }
+    else {
+        /* The connection is absent. */
+    }
+    if (IPSEC_OK == eFinalError) {
+        pCleanup->bLocalVerified = true;
+        pCleanup->bRecovered =
+            (IPSEC_OK != pCleanup->eTerminateError) ||
+            (IPSEC_OK != pCleanup->eWaitRemovedError) ||
+            (IPSEC_OK != pCleanup->eRemoveConnectionError) ||
+            (1U < pCleanup->uiTerminateAttempts) ||
+            (1U < pCleanup->uiWaitRemovedAttempts) ||
+            (1U < pCleanup->uiRemoveConnectionAttempts);
+    }
+    else {
+        /* Preserve the failed terminal verification result. */
+    }
+    return eFinalError;
 }
 
 static void WriteNativeAppJsonString(FILE *pFile, const char *pcText)
@@ -884,7 +1037,7 @@ static IpsecError_t OpenNativeAppAlgorithmJson(
     if (NULL == pWriter->pFile) {
         return IPSEC_ERR_FILE_OPEN;
     }
-    (void)fputs("{\n  \"schema_version\": 3,\n  \"run_id\": ",
+    (void)fputs("{\n  \"schema_version\": 4,\n  \"run_id\": ",
                 pWriter->pFile);
     WriteNativeAppJsonString(pWriter->pFile, pcRunId);
     (void)fputs(",\n  \"mode\": ", pWriter->pFile);
@@ -944,6 +1097,39 @@ static IpsecError_t AppendNativeAppAlgorithmJson(
     (void)fputs(", \"cleanup_error\": ", pFile);
     WriteNativeAppJsonString(
         pFile, GetNativeAppAlgorithmErrorText(pResult->eCleanupError));
+    (void)fputs(", \"cleanup\": {\"terminate_error\": ", pFile);
+    WriteNativeAppJsonString(
+        pFile, GetNativeAppAlgorithmErrorText(
+            pResult->Cleanup.eTerminateError));
+    (void)fputs(", \"wait_removed_error\": ", pFile);
+    WriteNativeAppJsonString(
+        pFile, GetNativeAppAlgorithmErrorText(
+            pResult->Cleanup.eWaitRemovedError));
+    (void)fputs(", \"remove_connection_error\": ", pFile);
+    WriteNativeAppJsonString(
+        pFile, GetNativeAppAlgorithmErrorText(
+            pResult->Cleanup.eRemoveConnectionError));
+    (void)fputs(", \"final_verify_error\": ", pFile);
+    WriteNativeAppJsonString(
+        pFile, GetNativeAppAlgorithmErrorText(
+            pResult->Cleanup.eFinalVerifyError));
+    (void)fputs(", \"peer_error\": ", pFile);
+    WriteNativeAppJsonString(
+        pFile, GetNativeAppAlgorithmErrorText(
+            pResult->Cleanup.ePeerError));
+    (void)fprintf(
+        pFile,
+        ", \"terminate_attempts\": %" PRIu32
+        ", \"wait_removed_attempts\": %" PRIu32
+        ", \"remove_connection_attempts\": %" PRIu32
+        ", \"peer_attempts\": %" PRIu32
+        ", \"recovered\": %s, \"local_verified\": %s}",
+        pResult->Cleanup.uiTerminateAttempts,
+        pResult->Cleanup.uiWaitRemovedAttempts,
+        pResult->Cleanup.uiRemoveConnectionAttempts,
+        pResult->Cleanup.uiPeerAttempts,
+        pResult->Cleanup.bRecovered ? "true" : "false",
+        pResult->Cleanup.bLocalVerified ? "true" : "false");
     (void)fprintf(pFile,
         ", \"ike_result\": \"%s\", \"esp_result\": \"%s\", "
         "\"xfrm_result\": \"%s\", \"data_path_result\": \"%s\"",
@@ -1114,19 +1300,51 @@ static IpsecError_t FinishNativeAppAlgorithmPeer(
     const NativeAppAlgorithmEndpoint_t *pRemote,
     const NativeAppAlgorithmCase_t *pCase,
     const char *pcAction,
-    uint32_t uiTimeoutMs)
+    uint32_t uiTimeoutMs,
+    NativeAppAlgorithmCleanup_t *pCleanup)
 {
     char acMessage[NATIVE_APP_ALGORITHM_MESSAGE_LENGTH];
-    IpsecError_t eError;
+    uint32_t uiAttemptTimeoutMs;
+    uint32_t uiAttempt;
+    IpsecError_t eError = IPSEC_OK;
 
+    if (NULL == pCleanup) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
     eError = FormatNativeAppAlgorithmMessage(acMessage, sizeof(acMessage),
                                              pcAction, pCase, "NONE", "0");
-    if (IPSEC_OK == eError) {
-        eError = SendNativeAppAlgorithmMessage(iSocket, pRemote, acMessage);
+    if (IPSEC_OK != eError) {
+        pCleanup->ePeerError = eError;
+        return eError;
     }
-    if (IPSEC_OK == eError) {
-        eError = WaitNativeAppAlgorithmResponse(
-            iSocket, pRemote, "DONE", pCase->acId, uiTimeoutMs, NULL, 0U);
+    uiAttemptTimeoutMs = uiTimeoutMs /
+        NATIVE_APP_ALGORITHM_CLEANUP_ATTEMPTS;
+    if (NATIVE_APP_ALGORITHM_POLL_MS > uiAttemptTimeoutMs) {
+        uiAttemptTimeoutMs = NATIVE_APP_ALGORITHM_POLL_MS;
+    }
+    for (uiAttempt = 0U;
+         uiAttempt < NATIVE_APP_ALGORITHM_CLEANUP_ATTEMPTS;
+         uiAttempt++) {
+        pCleanup->uiPeerAttempts++;
+        eError = SendNativeAppAlgorithmMessage(iSocket, pRemote, acMessage);
+        if (IPSEC_OK == eError) {
+            eError = WaitNativeAppAlgorithmResponse(
+                iSocket, pRemote, "DONE", pCase->acId,
+                uiAttemptTimeoutMs, NULL, 0U);
+        }
+        if (IPSEC_OK == eError) {
+            if (1U < pCleanup->uiPeerAttempts) {
+                pCleanup->bRecovered = true;
+            }
+            break;
+        }
+        RecordNativeAppAlgorithmCleanupError(&pCleanup->ePeerError, eError);
+        if ((uiAttempt + 1U) < NATIVE_APP_ALGORITHM_CLEANUP_ATTEMPTS) {
+            SleepNativeAppAlgorithm(NATIVE_APP_ALGORITHM_CLEANUP_RETRY_MS);
+        }
+        else {
+            /* The peer cleanup retry budget is exhausted. */
+        }
     }
     return eError;
 }
@@ -1244,7 +1462,8 @@ static IpsecError_t RunNativeAppAlgorithmCaseClient(
     if (bConnectionLoaded) {
         eCleanup = CleanupNativeAppAlgorithmCase(pContext, &Config,
                                                  pResult->uiReqid,
-                                                 bStartAttempted);
+                                                 bStartAttempted,
+                                                 &pResult->Cleanup);
         pResult->eCleanupError = eCleanup;
         if ((IPSEC_OK != eCleanup) && (IPSEC_OK == pResult->eError)) {
             pResult->eResult = NATIVE_APP_ALGORITHM_RESULT_FAIL_CLEANUP;
@@ -1252,12 +1471,16 @@ static IpsecError_t RunNativeAppAlgorithmCaseClient(
         }
     }
     else {
-        /* No local connection requires cleanup. */
+        pResult->Cleanup.bLocalVerified = true;
     }
     eCleanup = FinishNativeAppAlgorithmPeer(
         iSocket, pRemote, pCase,
         bConnectionLoaded ? "CLEANUP" : "ABORT",
-        pBaseConfig->uiTimeoutMs);
+        pBaseConfig->uiTimeoutMs, &pResult->Cleanup);
+    if ((IPSEC_OK != eCleanup) &&
+        (IPSEC_OK == pResult->eCleanupError)) {
+        pResult->eCleanupError = eCleanup;
+    }
     if ((IPSEC_OK != eCleanup) && (IPSEC_OK == pResult->eError)) {
         pResult->eResult = NATIVE_APP_ALGORITHM_RESULT_FAIL_CLEANUP;
         pResult->eError = eCleanup;
@@ -1403,7 +1626,7 @@ IpsecError_t RunNativeAppAlgorithmClient(
             (void)FinishNativeAppAlgorithmCaseReport(
                 pContext, pConfig, &Result, "initiator",
                 acResultDirectory, acCaseDirectory, uiOffset + 1U,
-                uiRequested, Result.eCleanupError);
+                uiRequested);
         }
         ReportNativeAppAlgorithm(
             pLog, stdout,
@@ -1419,10 +1642,18 @@ IpsecError_t RunNativeAppAlgorithmClient(
             pLog, stdout,
             (NATIVE_APP_ALGORITHM_RESULT_PASS == Result.eResult) ?
             "PASS" : "FAIL",
-            "result=%s case=%s duration=%" PRIu64 " ms error=%s",
+            "result=%s case=%s duration=%" PRIu64
+            " ms error=%s cleanup=%s recovered=%s"
+            " attempts=%" PRIu32 "/%" PRIu32 "/%" PRIu32 "/%" PRIu32,
             GetNativeAppAlgorithmResultName(Result.eResult), Result.Case.acId,
             Result.ullDurationMs,
-            GetNativeAppAlgorithmErrorText(Result.eError));
+            GetNativeAppAlgorithmErrorText(Result.eError),
+            GetNativeAppAlgorithmErrorText(Result.eCleanupError),
+            Result.Cleanup.bRecovered ? "yes" : "no",
+            Result.Cleanup.uiTerminateAttempts,
+            Result.Cleanup.uiWaitRemovedAttempts,
+            Result.Cleanup.uiRemoveConnectionAttempts,
+            Result.Cleanup.uiPeerAttempts);
         if (IPSEC_OK != AppendNativeAppAlgorithmJson(&Writer, &Result)) {
             eError = IPSEC_ERR_FILE_READ;
         }
@@ -1490,7 +1721,8 @@ static IpsecError_t RunNativeAppAlgorithmServerCase(
     const char *pcResultDirectory,
     const char *pcCaseDirectory,
     uint32_t uiOrdinal,
-    uint32_t uiRequested)
+    uint32_t uiRequested,
+    bool *pbCleanupVerified)
 {
     NativeAppAlgorithmCaseResult_t Result = {0};
     NativeAppRuntimeConfig_t Runtime = {0};
@@ -1504,6 +1736,10 @@ static IpsecError_t RunNativeAppAlgorithmServerCase(
     IpsecError_t eCaseError = IPSEC_OK;
     IpsecError_t eError;
 
+    if (NULL == pbCleanupVerified) {
+        return IPSEC_ERR_INVALID_ARGUMENT;
+    }
+    *pbCleanupVerified = false;
     Result.Case = *pCase;
     Result.eResult = NATIVE_APP_ALGORITHM_RESULT_FAIL_CONFIG;
     eError = BuildNativeAppAlgorithmConfig(pBaseConfig, pCase, &Config,
@@ -1574,7 +1810,8 @@ static IpsecError_t RunNativeAppAlgorithmServerCase(
 
             if (bConnectionLoaded) {
                 eCleanup = CleanupNativeAppAlgorithmCase(
-                    pContext, &Config, Result.uiReqid, false);
+                    pContext, &Config, Result.uiReqid, false,
+                    &Result.Cleanup);
                 bConnectionLoaded = false;
             }
             eCleanupResult = eCleanup;
@@ -1584,6 +1821,7 @@ static IpsecError_t RunNativeAppAlgorithmServerCase(
             }
             else {
                 eError = eCleanup;
+                Result.eResult = NATIVE_APP_ALGORITHM_RESULT_FAIL_CLEANUP;
             }
             if (0 == strcmp("ABORT", pacFields[1])) {
                 bVerified = true;
@@ -1600,9 +1838,15 @@ static IpsecError_t RunNativeAppAlgorithmServerCase(
     }
     if (bConnectionLoaded) {
         IpsecError_t eCleanup = CleanupNativeAppAlgorithmCase(
-            pContext, &Config, Result.uiReqid, false);
+            pContext, &Config, Result.uiReqid, false, &Result.Cleanup);
 
         eCleanupResult = eCleanup;
+        if (IPSEC_OK != eCleanup) {
+            Result.eResult = NATIVE_APP_ALGORITHM_RESULT_FAIL_CLEANUP;
+        }
+        else {
+            /* Preserve the verification result after successful cleanup. */
+        }
         if (IPSEC_OK == eError) {
             eError = eCleanup;
         }
@@ -1618,10 +1862,11 @@ static IpsecError_t RunNativeAppAlgorithmServerCase(
     }
     Result.eError = eError;
     Result.eCleanupError = eCleanupResult;
+    *pbCleanupVerified = Result.Cleanup.bLocalVerified;
     Result.ullDurationMs = GetNativeAppAlgorithmTimeMs() - ullStartMs;
     (void)FinishNativeAppAlgorithmCaseReport(
         pContext, &Config, &Result, "responder", pcResultDirectory,
-        pcCaseDirectory, uiOrdinal, uiRequested, eCleanupResult);
+        pcCaseDirectory, uiOrdinal, uiRequested);
     return eError;
 }
 
@@ -1633,6 +1878,7 @@ IpsecError_t RunNativeAppAlgorithmServer(
     NativeAppAlgorithmEndpoint_t Local;
     NativeAppAlgorithmEndpoint_t Peer;
     char acRunId[NATIVE_APP_ALGORITHM_RUN_ID_LENGTH] = {0};
+    char acLastCleanupCaseId[NATIVE_APP_ALGORITHM_CASE_ID_LENGTH] = {0};
     char acResultDirectory[NATIVE_APP_PATH_LENGTH] = {0};
     FILE *pLog = NULL;
     uint32_t uiRunRequested = 0U;
@@ -1699,7 +1945,22 @@ IpsecError_t RunNativeAppAlgorithmServer(
                 &uiFieldCount) || (3U > uiFieldCount)) {
             continue;
         }
-        if ((0 == strcmp("FINISH", pacFields[1])) &&
+        if (((0 == strcmp("CLEANUP", pacFields[1])) ||
+             (0 == strcmp("ABORT", pacFields[1]))) &&
+            ('\0' != acLastCleanupCaseId[0]) &&
+            (0 == strcmp(acLastCleanupCaseId, pacFields[2]))) {
+            eError = CopyNativeAppAlgorithmValue(
+                Case.acId, sizeof(Case.acId), pacFields[2]);
+            if (IPSEC_OK == eError) {
+                eError = ReplyNativeAppAlgorithmServer(
+                    iSocket, &Sender, "DONE", &Case, "OK");
+            }
+            if (IPSEC_OK != eError) {
+                break;
+            }
+            continue;
+        }
+        else if ((0 == strcmp("FINISH", pacFields[1])) &&
             ('\0' != acRunId[0]) &&
             (0 == strcmp(acRunId, pacFields[2]))) {
             eError = CopyNativeAppAlgorithmValue(
@@ -1790,6 +2051,7 @@ IpsecError_t RunNativeAppAlgorithmServer(
         }
         if (IPSEC_OK == eError) {
             char acCaseDirectory[NATIVE_APP_PATH_LENGTH] = {0};
+            bool bCleanupVerified = false;
 
             uiRunCaseOrdinal++;
             eError = CreateNativeAppAlgorithmCaseReport(
@@ -1810,7 +2072,15 @@ IpsecError_t RunNativeAppAlgorithmServer(
                 eError = RunNativeAppAlgorithmServerCase(
                     pContext, iSocket, &Peer, &Sender, pConfig, &Case,
                     acResultDirectory, acCaseDirectory, uiRunCaseOrdinal,
-                    uiRunRequested);
+                    uiRunRequested, &bCleanupVerified);
+                if (bCleanupVerified) {
+                    (void)CopyNativeAppAlgorithmValue(
+                        acLastCleanupCaseId, sizeof(acLastCleanupCaseId),
+                        Case.acId);
+                }
+                else {
+                    acLastCleanupCaseId[0] = '\0';
+                }
                 ReportNativeAppAlgorithm(
                     pLog, (IPSEC_OK == eError) ? stdout : stderr,
                     (IPSEC_OK == eError) ? "PASS" : "FAIL",

@@ -372,6 +372,12 @@ the v15-compatible `output_root=DIR` configuration setting:
 
 Result error fields use `none` when no error occurred. When an operation
 fails, the field contains the corresponding library error text instead.
+Schema version 4 records cleanup stages separately for IKE termination, SA and
+XFRM removal wait, connection removal, final verification, and peer cleanup.
+Cleanup operations are retried up to three times. A transient stage error that
+is followed by verified removal is reported as a recovered cleanup with the
+overall `cleanup_error` set to `none`; the original stage error and attempt
+count remain available for diagnostics.
 
 ```text
 ipsec> test algorithm run baseline --all --results baseline-results.json
